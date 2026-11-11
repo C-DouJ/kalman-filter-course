@@ -2,7 +2,7 @@
 
 一门可以动手拖的卡尔曼滤波入门课：每个概念都有交互图、逐步推导，以及 Python 和 MATLAB 代码。
 
-**在线阅读**：https://你的用户名.github.io/仓库名/  （启用 GitHub Pages 后把这里换成真实地址）
+**在线阅读**：https://c-douj.github.io/kalman-filter-course/
 
 ## 目录
 
@@ -22,7 +22,6 @@
 ## 文件
 
 - `index.html`：课程网页，双击即可离线打开
-- `lab.html`：配套实验台（二维跟踪、野值、鲁棒滤波）
 - `code/`：每一课的 Python 和 MATLAB 代码
 
 ## 运行代码
