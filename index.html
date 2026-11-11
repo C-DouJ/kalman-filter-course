@@ -1,0 +1,2330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>从零学卡尔曼滤波</title>
+<style>
+/* Layout: a course reader — fixed table of contents on the left, one lesson at a time on the right.
+   Three colours carry meaning everywhere (prose, equations, plots): amber = prediction, rose = measurement, blue = estimate. */
+:root {
+  --paper: #F3F4F6;
+  --sheet: #FFFFFF;
+  --ink: #161D27;
+  --ink-2: #4A5565;
+  --ink-3: #868F9C;
+  --rule: #DCE0E6;
+  --grid: #EBEEF2;
+  --pred: #B07208;
+  --pred-soft: rgba(176, 114, 8, .14);
+  --obs: #C1356A;
+  --obs-soft: rgba(193, 53, 106, .13);
+  --est: #2A56CF;
+  --est-soft: rgba(42, 86, 207, .16);
+  --code-bg: #F5F6F8;
+  --tk-com: #7B8594; --tk-kw: #8B3FB8; --tk-str: #2F7D4F; --tk-num: #B4561B; --tk-fn: #2A56CF;
+  --f-display: "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "STSong", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --f-body: "Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --f-math: "STIX Two Text", "STIX Two Math", "Cambria Math", "Times New Roman", "Noto Serif CJK SC", serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0E1218; --sheet: #151B23; --ink: #E5E9EF; --ink-2: #A9B2BF; --ink-3: #6E7886;
+    --rule: #262F3B; --grid: #1D2530; --pred: #F0B443; --pred-soft: rgba(240, 180, 67, .16);
+    --obs: #FF6F9F; --obs-soft: rgba(255, 111, 159, .15); --est: #82A2FF; --est-soft: rgba(130, 162, 255, .2);
+    --code-bg: #10151C; --tk-com: #6E7886; --tk-kw: #D29BFF; --tk-str: #7FD3A0; --tk-num: #FFAA70; --tk-fn: #82A2FF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0E1218; --sheet: #151B23; --ink: #E5E9EF; --ink-2: #A9B2BF; --ink-3: #6E7886;
+  --rule: #262F3B; --grid: #1D2530; --pred: #F0B443; --pred-soft: rgba(240, 180, 67, .16);
+  --obs: #FF6F9F; --obs-soft: rgba(255, 111, 159, .15); --est: #82A2FF; --est-soft: rgba(130, 162, 255, .2);
+  --code-bg: #10151C; --tk-com: #6E7886; --tk-kw: #D29BFF; --tk-str: #7FD3A0; --tk-num: #FFAA70; --tk-fn: #82A2FF;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { background: var(--paper); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 16px; line-height: 1.75; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--est); }
+:focus-visible { outline: 2px solid var(--est); outline-offset: 2px; }
+
+.shell {
+  max-width: 1220px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+  display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 40px;
+}
+
+/* ---------- table of contents ---------- */
+.side { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; padding-top: 32px; display: grid; gap: 22px; max-height: 100vh; overflow: auto; }
+.course { text-decoration: none; color: inherit; display: grid; gap: 2px; }
+.eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.course strong { font-family: var(--f-display); font-weight: 900; font-size: 22px; line-height: 1.3; }
+.toc { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 14px; line-height: 1.45; }
+.toc a, .toc .soon { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 7px 10px; border-radius: 8px; text-decoration: none; color: var(--ink-2); }
+.toc a:hover { background: var(--sheet); color: var(--ink); }
+.toc a[aria-current="page"] { background: var(--ink); color: var(--paper); }
+.toc a[aria-current="page"] .n { color: var(--paper); }
+.toc .n { font-family: var(--f-mono); font-size: 12px; color: var(--ink-3); }
+.toc .soon { color: var(--ink-3); }
+.toc-sep { font-size: 11.5px; letter-spacing: .08em; color: var(--ink-3); padding: 10px 10px 2px; }
+.toc-sep:first-child { padding-top: 0; }
+details.answer { border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet); padding: 10px 16px; }
+details.answer summary { cursor: pointer; font-weight: 500; font-size: 14.5px; }
+details.answer[open] summary { margin-bottom: 8px; }
+details.answer p + p { margin-top: 8px; }
+.toc small { display: block; font-size: 12px; }
+.toc a small { color: var(--ink-3); }
+.toc a[aria-current="page"] small { color: var(--paper); opacity: .7; }
+.toc small a { display: inline; padding: 0; color: var(--est); }
+.key { display: grid; gap: 6px; font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--rule); padding-top: 14px; }
+.key b { font-weight: 500; }
+.key .kh { font-size: 12px; color: var(--ink-3); }
+.kc { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 0; }
+.lab { font-size: 13px; line-height: 1.5; text-decoration: none; border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; color: var(--ink); background: var(--sheet); display: grid; gap: 2px; }
+.lab small { color: var(--ink-3); font-size: 12px; }
+.lab:hover { border-color: var(--ink-3); }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .side { position: static; max-height: none; overflow: visible; padding-top: 20px; gap: 12px; }
+  .toc { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; padding-bottom: 4px; }
+  .toc small { display: none; }
+  .toc-sep { display: none; }
+  .key { grid-auto-flow: column; grid-auto-columns: max-content; gap: 14px; overflow-x: auto; }
+  .key .kh, .lab { display: none; }
+}
+
+/* ---------- lesson ---------- */
+.content { min-width: 0; padding-top: 32px; }
+.lesson { display: grid; gap: 22px; }
+.lesson > * { max-width: 720px; }
+.lesson > .wide { max-width: 940px; }
+.lesson-head { display: grid; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
+.lesson-head h1 { margin: 0; font-family: var(--f-display); font-weight: 900; font-size: clamp(30px, 4.6vw, 44px); line-height: 1.2; letter-spacing: .02em; text-wrap: balance; }
+.lede { margin: 0; font-size: 17.5px; color: var(--ink-2); }
+h2 { margin: 18px 0 0; font-family: var(--f-display); font-weight: 900; font-size: 24px; line-height: 1.35; text-wrap: balance; }
+p { margin: 0; }
+.lesson ul, .lesson ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+.pr { color: var(--pred); }
+.ob { color: var(--obs); }
+.es { color: var(--est); }
+strong.pr, strong.ob, strong.es { font-weight: 700; }
+
+.callout { border-left: 3px solid var(--ink); padding: 4px 0 4px 16px; display: grid; gap: 6px; }
+.callout.thm { border-left-color: var(--est); background: var(--sheet); border-radius: 0 10px 10px 0; padding: 14px 18px; }
+.callout .cl { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; color: var(--ink-3); }
+
+/* math */
+.m { font-family: var(--f-math); font-size: 1.12em; white-space: nowrap; }
+.m i { font-style: italic; }
+.til { position: relative; display: inline-block; line-height: 1; }
+.til::after { content: "~"; position: absolute; left: 58%; top: -.5em; transform: translateX(-50%); font-style: normal; font-size: .85em; line-height: 1; }
+.hat { position: relative; display: inline-block; line-height: 1; }
+.hat::after { content: ""; position: absolute; left: 60%; top: .16em; width: .28em; height: .28em; border-left: .07em solid currentColor; border-top: .07em solid currentColor; transform: translateX(-50%) scaleY(.62) rotate(45deg); }
+.ss { display: inline-flex; flex-direction: column; vertical-align: .53em; font-size: .68em; line-height: 1; margin-left: .06em; }
+.ss > span { display: block; }
+.m sub, .m sup { font-size: .68em; line-height: 0; }
+.fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; margin: 0 .12em; }
+.fr > span { padding: 0 .25em; line-height: 1.3; }
+.fr > span:first-child { border-bottom: 1px solid currentColor; }
+.eq { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 18px; }
+.eq .body { overflow-x: auto; font-size: 18px; line-height: 2.1; }
+.eq .tag { font-family: var(--f-mono); font-size: 12px; color: var(--ink-3); }
+.eqs { display: grid; gap: 8px; }
+
+.steps { list-style: none; padding: 0 !important; margin: 0; counter-reset: st; display: grid; gap: 0 !important; }
+.steps > li { counter-increment: st; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 4px 12px; padding: 14px 0; border-top: 1px solid var(--rule); }
+.steps > li::before { content: counter(st); font-family: var(--f-mono); font-size: 13px; color: var(--ink-3); padding-top: 2px; }
+.steps > li > * { grid-column: 2; min-width: 0; }
+.steps li > p .m { white-space: normal; }
+.steps .mrow { overflow-x: auto; font-size: 18px; line-height: 2.2; padding: 2px 0; }
+.steps .live { font-family: var(--f-body); font-size: 15px; background: var(--paper); border-radius: 8px; padding: 6px 12px; justify-self: start; }
+
+table.sym { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.sym th, table.sym td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+table.sym th { font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
+.tbl { overflow-x: auto; }
+
+/* figures */
+.fig { background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 16px; display: grid; gap: 14px; }
+.fig-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.fig-title b { font-size: 15px; }
+.fig-title span { font-size: 13px; color: var(--ink-3); }
+.fig canvas { display: block; width: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--ink-2); }
+.lg { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 18px; height: 0; border-top: 2.5px solid; }
+.sw.dash { border-top-style: dashed; border-top-width: 2px; }
+.dotm { width: 8px; height: 8px; border-radius: 50%; }
+.ctrls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 22px; }
+.field { display: grid; gap: 4px; }
+.frow { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13.5px; color: var(--ink-2); }
+.val { font-family: var(--f-mono); font-size: 12.5px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.field input[type=range] { width: 100%; margin: 0; accent-color: var(--ink); }
+.field.pr input[type=range] { accent-color: var(--pred); }
+.field.ob input[type=range] { accent-color: var(--obs); }
+.field.es input[type=range] { accent-color: var(--est); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--rule); background: var(--sheet); border-radius: 8px; padding: 7px 13px; font-size: 13.5px; font-weight: 500; line-height: 1.3; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.chip { border: 1px solid var(--rule); background: transparent; border-radius: 999px; padding: 4px 12px; font-size: 13px; color: var(--ink-2); }
+.chip:hover { border-color: var(--ink-3); color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.chip svg { width: 28px; height: 14px; margin-right: 6px; vertical-align: -2px; }
+#l2dists .chip { padding: 5px 12px 5px 10px; font-size: 13.5px; }
+.distnote { font-size: 14px; color: var(--ink-2); min-height: 1.75em; }
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--rule); border-radius: 8px; padding: 3px; gap: 3px; max-width: 100%; }
+.seg button { border: 0; background: transparent; border-radius: 6px; padding: 6px 10px; font-size: 13px; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.kcard { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 26px; align-items: center; background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 20px; }
+.kc-f { display: grid; gap: 0; }
+.kc-n { font-size: 12px; letter-spacing: .08em; color: var(--ink-3); }
+.kc-f .m { font-size: 21px; line-height: 2.1; }
+.kc-r { display: grid; gap: 2px; min-width: 0; }
+.kc-r b { font-size: 15px; }
+.kc-r span { font-size: 13px; color: var(--ink-2); }
+.kc-dots { display: flex; gap: 6px; margin-top: 4px; }
+.kc-dots i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink-3); }
+.kc-dots i.on { background: var(--est); border-color: var(--est); }
+@media (max-width: 520px) { .kcard { grid-template-columns: minmax(0, 1fr); } }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
+.toggle input { margin: 0; width: 15px; height: 15px; }
+.kpos { font-family: var(--f-mono); font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-left: auto; }
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.ro { border-top: 2px solid; padding-top: 6px; display: grid; gap: 0; }
+.ro span { font-size: 12.5px; color: var(--ink-2); }
+.ro b { font-family: var(--f-mono); font-weight: 500; font-size: 18px; font-variant-numeric: tabular-nums; }
+.ro.off { opacity: .35; }
+.livepanel { display: grid; gap: 4px; background: var(--paper); border-radius: 10px; padding: 12px 16px; }
+.livepanel .row { overflow-x: auto; font-size: 17px; line-height: 2.2; }
+.livepanel .note { font-size: 14px; color: var(--ink-2); }
+.livepanel .num, .live .num { font-family: var(--f-mono); font-size: .8em; font-style: normal; }
+
+/* lesson 3 stepper */
+.now { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; align-items: baseline; background: var(--paper); border-radius: 10px; padding: 10px 14px; }
+.now .tagbig { font-family: var(--f-mono); font-size: 13px; color: var(--ink-3); white-space: nowrap; }
+.now p { font-size: 15px; }
+.stepper { display: grid; gap: 4px; }
+.phase { font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--ink-3); margin-top: 6px; }
+.srow { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; padding: 4px 10px; border-radius: 8px; border: 1px solid transparent; transition: background .2s; }
+.srow .t { font-family: var(--f-math); font-size: 17px; color: var(--ink-3); }
+.srow .b { overflow-x: auto; font-size: 17px; line-height: 2.1; color: var(--ink-3); }
+.srow .b .num { color: var(--ink-3); }
+.srow.done .b { color: var(--ink); }
+.srow.done .t { color: var(--ink-2); }
+.srow.cur { background: var(--paper); border-color: var(--rule); }
+.srow.cur .t { color: var(--ink); font-weight: 600; }
+.srow.cur .b { color: var(--ink); }
+.srow .num { font-family: var(--f-mono); font-size: .78em; font-style: normal; }
+.srow.todo .m { opacity: .55; }
+.init { font-size: 14px; color: var(--ink-2); }
+.strips { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 680px) { .strips { grid-template-columns: minmax(0, 1fr); } }
+.strip { display: grid; gap: 4px; min-width: 0; }
+.strip .cap { font-size: 12.5px; color: var(--ink-2); }
+.l6pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.l6pair .cap { font-size: 13px; line-height: 1.55; min-height: 4.7em; }
+.l6pair .cap b { color: var(--ink); font-size: 14px; }
+@media (max-width: 680px) { .l6pair { grid-template-columns: minmax(0, 1fr); } .l6pair .cap { min-height: 0; } }
+
+/* code */
+.code { border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; background: var(--code-bg); }
+.code-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--rule); background: var(--sheet); flex-wrap: wrap; }
+.code-head .tab { border: 0; background: transparent; padding: 5px 12px; border-radius: 6px; font-size: 13px; color: var(--ink-2); }
+.code-head .tab[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+.code-head .copy { margin-left: auto; }
+.code-head .hint { font-size: 12px; color: var(--ink-3); }
+.code pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--f-mono); font-size: 13px; line-height: 1.65; tab-size: 4; }
+.code code { font-family: inherit; color: var(--ink); }
+.token.comment { color: var(--tk-com); font-style: italic; }
+.token.keyword, .token.builtin, .token.boolean { color: var(--tk-kw); }
+.token.string, .token.triple-quoted-string { color: var(--tk-str); }
+.token.number { color: var(--tk-num); }
+.token.function { color: var(--tk-fn); }
+.token.operator, .token.punctuation { color: var(--ink-2); }
+
+.pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--rule); padding-top: 18px; margin-top: 10px; }
+.pager a, .pager span { text-decoration: none; display: grid; gap: 2px; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet); color: var(--ink); min-width: 0; }
+.pager small { font-size: 12px; color: var(--ink-3); }
+.pager a:hover { border-color: var(--ink-3); }
+.pager .next { text-align: right; margin-left: auto; }
+.pager span.next { color: var(--ink-3); }
+
+@media (prefers-reduced-motion: reduce) { .srow { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <nav class="side" aria-label="课程目录">
+    <a class="course" href="#lesson-1"><span class="eyebrow">Kalman filter · 入门篇 · 标量情形</span><strong>从零学卡尔曼滤波</strong></a>
+    <ol class="toc">
+      <li class="toc-sep">主干</li>
+      <li><a href="#lesson-1" data-r="lesson-1"><span class="n">1</span><span>为什么要滤波</span></a></li>
+      <li><a href="#lesson-2" data-r="lesson-2"><span class="n">2</span><span>权重该怎么选<small>主线 · 线性最小方差</small></span></a></li>
+      <li><a href="#lesson-3" data-r="lesson-3"><span class="n">3</span><span>单步跑一遍</span></a></li>
+      <li class="toc-sep">选读 · 换个角度看</li>
+      <li><a href="#lesson-4" data-r="lesson-4"><span class="n">4</span><span>贝叶斯视角<small>高斯给了我们什么</small></span></a></li>
+      <li><a href="#lesson-5" data-r="lesson-5"><span class="n">5</span><span>极大后验视角<small>加权最小二乘与两根弹簧</small></span></a></li>
+      <li><span class="soon"><span class="n">6</span><span>几何视角<small>即将上线</small></span></span></li>
+      <li><span class="soon"><span class="n">7</span><span>工程视角与十视角总览<small>即将上线</small></span></span></li>
+      <li><span class="soon"><span class="n">+</span><span>进阶篇<small>一般线性时变系统，再到非线性、模型失配</small></span></span></li>
+    </ol>
+    <div class="key" aria-label="颜色约定">
+      <span class="kh">全课程的颜色约定</span>
+      <span><i class="kc" style="background:var(--pred)"></i><b class="pr">黄</b> 预测</span>
+      <span><i class="kc" style="background:var(--obs)"></i><b class="ob">红</b> 观测（传感器读数）</span>
+      <span><i class="kc" style="background:var(--est)"></i><b class="es">蓝</b> 估计（滤波结果）</span>
+    </div>
+    <a class="lab" href="lab.html" target="_blank" rel="noopener">配套实验台 ↗<small>二维跟踪、野值、鲁棒滤波</small></a>
+  </nav>
+
+  <main class="content">
+  <!-- ======================= LESSON 1 ======================= -->
+  <article class="lesson" id="lesson-1">
+    <header class="lesson-head">
+      <span class="eyebrow">第 1 课 · 约 10 分钟</span>
+      <h1>为什么要滤波</h1>
+      <p class="lede">一辆小车沿着直轨道往前开，你想知道它此刻到底在哪。手上有两条线索，可惜哪条都不完全可靠。</p>
+    </header>
+
+    <div class="callout">
+      <span class="cl">入门篇的范围</span>
+      <p>入门篇只用一个最简单的例子：状态是一个<strong>标量</strong>（小车的位置），模型<strong>不随时间变化</strong>（F、H、Q、R 都是常数，其中 F 是状态转移系数，H 是量测系数，在小车的例子里都等于 1）。这样可以把全部注意力放在「为什么」上。进阶篇会把所有结论推广到一般的线性时变系统：状态变成向量，F、H、Q、R 变成可以随时间变化的矩阵。公式会变复杂，但每一步的道理和这里完全一样。</p>
+    </div>
+
+    <h2>两条线索</h2>
+    <p><strong class="pr">线索一：运动规律。</strong>你知道小车的速度大约是 1 m/s，所以每过 1 秒，它大概往前走 1 米。从起点开始一路推算，就能估出它的位置。这叫<strong class="pr">预测</strong>，也叫航位推算。问题是路面不平、轮子打滑，每一步都会差一点，而这一点点误差会一直累积下去。</p>
+    <p><strong class="ob">线索二：传感器。</strong>小车上装了一个定位传感器（比如超声波测距或 GPS），每秒报告一次位置。问题是每次读数都带着随机噪声，忽大忽小。</p>
+
+    <section class="fig wide" aria-label="交互：两种偷懒办法">
+      <div class="fig-title"><b>镜头跟着小车走</b><span>上面一排是各种办法给出的位置，下面是读数</span></div>
+      <canvas id="l1track" style="height:170px" aria-label="小车、传感器读数和推算位置"></canvas>
+      <div class="fig-title"><b>误差随时间的变化</b><span>误差 = 估计位置 − 真实位置</span></div>
+      <canvas id="l1err" style="height:190px" aria-label="两种办法的误差随时间变化"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw pr" style="border-color:var(--pred)"></span>只信预测</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--pred)"></span>±√k·σ<sub>w</sub>（理论值，见下面推导）</span>
+        <span class="lg"><span class="dotm" style="background:var(--obs)"></span>只信传感器</span>
+        <span class="lg"><span class="sw" style="border-color:var(--obs-soft);border-top-width:8px"></span>±σ<sub>R</sub></span>
+        <span class="lg" id="l1lgK"><span class="sw" style="border-color:var(--est)"></span>卡尔曼滤波</span>
+      </div>
+      <div class="bar">
+        <button class="btn primary" id="l1play" type="button">▶ 播放</button>
+        <button class="btn" id="l1step" type="button">单步</button>
+        <button class="btn" id="l1seed" type="button">换一组随机数</button>
+        <span class="kpos" id="l1k">k = 199</span>
+      </div>
+      <div class="ctrls">
+        <div class="field ob"><div class="frow"><label for="l1sr">传感器噪声 σ<sub>R</sub></label><span class="val" id="l1srv"></span></div><input type="range" id="l1sr" min="0.5" max="5" step="0.1" value="2"></div>
+        <div class="field pr"><div class="frow"><label for="l1sw">运动扰动 σ<sub>w</sub></label><span class="val" id="l1swv"></span></div><input type="range" id="l1sw" min="0.05" max="1.2" step="0.05" value="0.5"></div>
+      </div>
+      <div class="bar">
+        <label class="toggle"><input type="checkbox" id="l1kf" checked>显示卡尔曼滤波（蓝线，第 2、3 课讲它怎么来的）</label>
+      </div>
+      <div class="readout">
+        <div class="ro" style="border-color:var(--pred)"><span>只信预测 · RMSE</span><b id="l1r1"></b></div>
+        <div class="ro" style="border-color:var(--obs)"><span>只信传感器 · RMSE</span><b id="l1r2"></b></div>
+        <div class="ro off" id="l1r3box" style="border-color:var(--est)"><span>卡尔曼滤波 · RMSE</span><b id="l1r3"></b></div>
+      </div>
+    </section>
+
+    <h2>看出了什么</h2>
+    <ul>
+      <li><span class="pr">黄线</span>（只信预测）像醉汉走路，越走越远，虚线边界按 √k 张开。</li>
+      <li><span class="ob">红点</span>（只信传感器）不会累积，但每一步都在 ±σ<sub>R</sub> 附近乱跳。</li>
+      <li>把 σ<sub>w</sub> 调小、σ<sub>R</sub> 调大，预测能撑更久；反过来，传感器更占优。</li>
+      <li><span class="es">蓝线</span>是卡尔曼滤波，它比两条线索单独用都准。它做的事，就是每一步按「谁更靠谱」给两条线索分配权重。第 2 课讲这个权重怎么算，第 3 课把它一步步跑起来。</li>
+    </ul>
+
+    <h2>把问题写成公式</h2>
+    <p>先把上面的故事翻译成数学。整门课都用这两个式子：</p>
+    <div class="eqs">
+      <div class="eq"><div class="body m" id="eqMotion"></div><span class="tag">运动模型</span></div>
+      <div class="eq"><div class="body m" id="eqMeas"></div><span class="tag">观测模型</span></div>
+    </div>
+    <div class="tbl">
+      <table class="sym">
+        <thead><tr><th>符号</th><th>含义</th><th>在本例里</th></tr></thead>
+        <tbody id="symTable"></tbody>
+      </table>
+    </div>
+    <p>这里只要求扰动和噪声的均值为 0、方差分别是 <span class="m"><i>Q</i></span> 和 <span class="m"><i>R</i></span>，<strong>不要求它们服从高斯分布</strong>。方差是标准差的平方，所以 <span class="m"><i>Q</i> = <i>σ</i><sub>w</sub><sup>2</sup></span>，<span class="m"><i>R</i> = <i>σ</i><sub>R</sub><sup>2</sup></span>。网页里的仿真用的是高斯噪声，但后面推出的公式并不依赖这一点。</p>
+    <p>除了均值和方差，还需要三条「互不相关」的假设。后面每次写「方差相加」「交叉项为 0」，靠的都是它们：</p>
+    <ol>
+      <li><strong>噪声是白的。</strong>不同时刻的过程噪声互不相关，不同时刻的量测噪声也互不相关：<span class="m">E[<i>w</i><sub><i>k</i></sub><i>w</i><sub><i>j</i></sub>] = 0</span>，<span class="m">E[<i>v</i><sub><i>k</i></sub><i>v</i><sub><i>j</i></sub>] = 0</span>（<span class="m"><i>k</i> ≠ <i>j</i></span>）。这一步打滑了多少，和上一步打滑了多少无关。</li>
+      <li><strong>过程噪声和量测噪声互不相关。</strong>对任意两个时刻都有 <span class="m">E[<i>w</i><sub><i>k</i></sub><i>v</i><sub><i>j</i></sub>] = 0</span>。路面怎么颠，和传感器怎么抖，是两回事。</li>
+      <li><strong>两种噪声都和初始误差不相关。</strong>初始估计的误差 <span class="m"><i>x̂</i><sub>0</sub> − <i>x</i><sub>0</sub></span> 和之后所有的 <span class="m"><i>w</i><sub><i>k</i></sub></span>、<span class="m"><i>v</i><sub><i>k</i></sub></span> 都不相关。起点猜得准不准，不影响后面的噪声。</li>
+    </ol>
+    <p>这里要求的是「不相关」，比「相互独立」弱；很多教材直接假设相互独立，那当然也满足。如果这些假设不成立，比如噪声前后相关（有色噪声），或者过程噪声和量测噪声相关，公式就需要修正，这是进阶篇的内容。</p>
+
+    <h2>推导：为什么只信预测会越来越差</h2>
+    <ol class="steps" id="l1steps"></ol>
+    <div class="callout">
+      <span class="cl">结论</span>
+      <p>在 <span class="m"><i>k</i><sub>c</sub></span> 之前预测更准，之后传感器更准。但这只是二选一。下一课会看到，把两条线索按方差加权融合，结果比任何一条单独用都好。</p>
+    </div>
+
+    <h2>自己跑一遍</h2>
+    <p>下面的代码生成同样的小车和读数，算出两种偷懒办法和卡尔曼滤波的误差。卡尔曼滤波那五行先照着用，它们怎么来的是后面两课的内容。代码每次运行都会生成新的随机数，和网页里的也不一样，具体数字会有差别，但规律相同。</p>
+    <div class="code" data-code>
+      <div class="code-head"><button class="tab" type="button" data-lang="py" aria-selected="true">Python</button><button class="tab" type="button" data-lang="m" aria-selected="false">MATLAB</button><span class="hint">需要 numpy、matplotlib</span><button class="btn copy" type="button">复制</button></div>
+<pre data-lang="py"><code class="language-python">import numpy as np
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC']
+plt.rcParams['axes.unicode_minus'] = False
+
+# 1. 设定：小车沿直线开，名义速度 u = 1 m/s，每 Δt = 1 s 读一次传感器
+N, dt, u = 200, 1.0, 1.0
+Q = 0.5**2        # 运动扰动的方差（打滑、路面不平），σ_w = 0.5 m
+R = 2.0**2        # 传感器噪声的方差，σ_R = 2 m
+rng = np.random.default_rng()
+
+# 2. 生成真实位置和传感器读数（真实位置只有我们知道，滤波器看不到）
+x_true = np.zeros(N)
+for k in range(1, N):
+    x_true[k] = x_true[k-1] + u*dt + rng.normal(0, np.sqrt(Q))
+z = x_true + rng.normal(0, np.sqrt(R), N)
+
+# 3. 两种“偷懒”的办法
+x_dr = np.arange(N) * u * dt      # 只信预测：从起点按名义速度一路推算
+x_meas = z                        # 只信传感器：读数是多少就是多少
+
+# 4. 卡尔曼滤波：每一步按“谁更靠谱”把预测和读数加权（这五行怎么来的，第 2、3 课讲）
+x_kf = np.zeros(N)
+P = 0.0                           # 起点已知，所以初始误差方差为 0
+for k in range(1, N):
+    x_pred = x_kf[k-1] + u*dt     # 预测位置
+    P_pred = P + Q                # 预测的不确定性
+    K = P_pred / (P_pred + R)     # 给读数的权重
+    x_kf[k] = x_pred + K * (z[k] - x_pred)   # 用读数修正
+    P = (1 - K) * P_pred          # 修正后的不确定性
+
+for name, est in [('只信预测', x_dr), ('只信传感器', x_meas), ('卡尔曼滤波', x_kf)]:
+    rmse = np.sqrt(np.mean((est - x_true)**2))
+    print(f'{name}: RMSE = {rmse:.2f} m')
+print(f'理论交叉点 k_c = R/Q = {R/Q:.0f} 步')
+
+k = np.arange(N)
+plt.plot(k, x_dr - x_true, label='只信预测的误差')
+plt.plot(k, z - x_true, '.', label='只信传感器的误差')
+plt.plot(k, x_kf - x_true, lw=2, label='卡尔曼滤波的误差')
+plt.plot(k, np.sqrt(k*Q), 'k:', k, -np.sqrt(k*Q), 'k:')
+plt.axhline(0, color='gray', lw=0.5)
+plt.xlabel('k（步）'); plt.ylabel('误差 (m)'); plt.legend(); plt.show()</code></pre>
+<pre data-lang="m" hidden><code class="language-matlab">% 1. 设定：小车沿直线开，名义速度 u = 1 m/s，每 Δt = 1 s 读一次传感器
+N = 200; dt = 1; u = 1;
+Q = 0.5^2;        % 运动扰动的方差，σ_w = 0.5 m
+R = 2^2;          % 传感器噪声的方差，σ_R = 2 m
+
+% 2. 生成真实位置和传感器读数（真实位置只有我们知道，滤波器看不到）
+x_true = zeros(1, N);
+for k = 2:N
+    x_true(k) = x_true(k-1) + u*dt + sqrt(Q)*randn;
+end
+z = x_true + sqrt(R)*randn(1, N);
+
+% 3. 两种“偷懒”的办法
+x_dr = (0:N-1) * u * dt;          % 只信预测：从起点按名义速度一路推算
+
+% 4. 卡尔曼滤波：每一步按“谁更靠谱”把预测和读数加权（这五行怎么来的，第 2、3 课讲）
+x_kf = zeros(1, N); P = 0;        % 起点已知，所以初始误差方差为 0
+for k = 2:N
+    x_pred = x_kf(k-1) + u*dt;    % 预测位置
+    P_pred = P + Q;               % 预测的不确定性
+    K = P_pred / (P_pred + R);    % 给读数的权重
+    x_kf(k) = x_pred + K * (z(k) - x_pred);   % 用读数修正
+    P = (1 - K) * P_pred;         % 修正后的不确定性
+end
+
+fprintf('只信预测:   RMSE = %.2f m\n', sqrt(mean((x_dr - x_true).^2)));
+fprintf('只信传感器: RMSE = %.2f m\n', sqrt(mean((z - x_true).^2)));
+fprintf('卡尔曼滤波: RMSE = %.2f m\n', sqrt(mean((x_kf - x_true).^2)));
+fprintf('理论交叉点 k_c = R/Q = %.0f 步\n', R/Q);
+
+% 画图：颜色和网页一致，黄 = 预测，红 = 读数，蓝 = 卡尔曼滤波
+cPred = [0.69 0.45 0.03]; cObs = [0.76 0.21 0.42]; cEst = [0.16 0.34 0.81];
+k = 0:N-1;
+figure('Color', 'w', 'Position', [100 100 780 420]); hold on;
+fill([k, fliplr(k)], sqrt(R) * [ones(1, N), -ones(1, N)], cObs, 'FaceAlpha', 0.10, 'EdgeColor', 'none');
+plot(k, sqrt(k*Q), '--', 'Color', cPred, 'LineWidth', 1);
+plot(k, -sqrt(k*Q), '--', 'Color', cPred, 'LineWidth', 1, 'HandleVisibility', 'off');
+plot(k, z - x_true, '.', 'Color', cObs, 'MarkerSize', 12);
+plot(k, x_dr - x_true, '-', 'Color', cPred, 'LineWidth', 2);
+plot(k, x_kf - x_true, '-', 'Color', cEst, 'LineWidth', 2);
+plot([0 N-1], [0 0], '-', 'Color', [.6 .6 .6], 'HandleVisibility', 'off');
+hold off; grid on; box off; set(gca, 'FontSize', 12); xlim([0 N-1]);
+legend('读数噪声的 ±σ_R 范围', '理论 ±√(kQ)', '只信传感器的误差', '只信预测的误差', '卡尔曼滤波的误差', 'Location', 'northwest', 'Box', 'off');
+xlabel('k（步）'); ylabel('误差 (m)'); title('两种偷懒办法和卡尔曼滤波的误差');</code></pre>
+    </div>
+
+    <nav class="pager" aria-label="翻页">
+      <a class="next" href="#lesson-2"><small>下一课</small>第 2 课 · 权重该怎么选 →</a>
+    </nav>
+  </article>
+
+  <!-- ======================= LESSON 2 ======================= -->
+  <article class="lesson" id="lesson-2" hidden>
+    <header class="lesson-head">
+      <span class="eyebrow">第 2 课 · 主线 · 约 15 分钟</span>
+      <h1>权重该怎么选</h1>
+      <p class="lede">此刻你手上有一个<span class="pr">预测</span>和一个<span class="ob">读数</span>，都不精确，说的数还不一样。最自然的想法是取个加权平均，问题是权重怎么选。这一课只用到期望和方差，不对噪声的分布形状做任何假设。</p>
+    </header>
+
+    <h2>写成加权修正</h2>
+    <p>把估计写成预测和读数的加权平均，再整理一下：</p>
+    <div class="eq"><div class="body m" id="l2form"></div><span class="tag">加权修正</span></div>
+    <p><span class="m"><i>K</i></span> = 0 表示只信预测，<span class="m"><i>K</i></span> = 1 表示只信读数。括号里的差叫<strong>新息</strong>，是读数里预测没料到的那部分。估计就是从预测出发，往读数的方向挪 <span class="m"><i>K</i></span> 倍的新息。</p>
+    <p>怎么评价一个 <span class="m"><i>K</i></span> 好不好？看估计误差的方差：方差越小，估计越稳。下面拖动 <span class="m"><i>K</i></span>，找出让方差最小的那一点。</p>
+
+    <section class="fig wide" aria-label="交互：选一个让方差最小的 K">
+      <div class="fig-title"><b>估计误差的方差随 K 的变化</b><span>圆点是 5000 次随机实验的实测值</span></div>
+      <canvas id="l2par" style="height:280px" aria-label="方差随 K 变化的抛物线和实验点"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="border-color:var(--ink)"></span>理论 P(K)</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--pred)"></span>预测误差的贡献 (1−K)²P⁻</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--obs)"></span>读数噪声的贡献 K²R</span>
+        <span class="lg"><span class="dotm" style="border:1.5px solid var(--ink-2);background:transparent"></span>实验</span>
+      </div>
+      <div class="ctrls">
+        <div class="field"><div class="frow"><label for="l2K">增益 K</label><span class="val" id="l2Kv"></span></div><input type="range" id="l2K" min="0" max="1" step="0.01" value="0.5"></div>
+        <div class="field pr"><div class="frow"><label for="l2sp">预测误差的标准差 √P⁻</label><span class="val" id="l2spv"></span></div><input type="range" id="l2sp" min="0.3" max="4" step="0.05" value="2"></div>
+        <div class="field ob"><div class="frow"><label for="l2sr">读数噪声的标准差 √R</label><span class="val" id="l2srv"></span></div><input type="range" id="l2sr" min="0.3" max="4" step="0.05" value="1"></div>
+      </div>
+      <div class="bar"><button class="btn" id="l2best" type="button">跳到最优 K</button></div>
+      <div class="readout">
+        <div class="ro" style="border-color:var(--ink)"><span>当前 K 的理论方差</span><b id="l2r1"></b></div>
+        <div class="ro" style="border-color:var(--ink-3)"><span>实测方差</span><b id="l2r2"></b></div>
+        <div class="ro" style="border-color:var(--est)"><span>最优 K*</span><b id="l2r3"></b></div>
+        <div class="ro" style="border-color:var(--est)"><span>最小方差 P</span><b id="l2r4"></b></div>
+      </div>
+    </section>
+
+    <h2>看出了什么</h2>
+    <ul>
+      <li>方差随 <span class="m"><i>K</i></span> 的变化是一条开口向上的抛物线。<span class="m"><i>K</i></span> 太小，<span class="pr">预测误差</span>占主导；<span class="m"><i>K</i></span> 太大，<span class="ob">读数噪声</span>占主导。最低点在两者之间。</li>
+      <li>最低点的方差比 P⁻ 和 R 都小：把两个都不精确的判断融合起来，得到一个更精确的判断。</li>
+      <li>把读数噪声调大，K* 往左移，更相信预测；把预测误差调大，K* 往右移，更相信读数。</li>
+    </ul>
+
+    <h2>推导：最优的 K</h2>
+    <ol class="steps" id="l2steps"></ol>
+
+    <h2>这个结论依赖高斯吗？</h2>
+    <p>回头看推导，只用到了均值、方差和「不相关」，从头到尾没有提噪声长什么样。下面用实验验证：四种噪声的均值都是 0、方差也都一样，只是<strong>分布的形状</strong>不同。每种做 5000 次实验，看实测方差是否还落在同一条抛物线上。预测误差和读数噪声的大小沿用上面的设置。</p>
+    <section class="fig wide" aria-label="交互：换一种噪声分布">
+      <div class="bar" id="l2dists" role="group" aria-label="噪声的分布"></div>
+      <p class="distnote" id="l2distnote"></p>
+      <canvas id="l2par2" style="height:230px" aria-label="当前分布下方差随 K 的变化"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="border-color:var(--ink)"></span>理论 P(K)，和分布无关</span>
+        <span class="lg"><span class="dotm" style="border:1.5px solid var(--ink-2);background:transparent"></span>这种分布下的实验</span>
+      </div>
+      <div class="fig-title"><b>在最优 K* 处，5000 次实验的估计误差</b><span id="l2histnote"></span></div>
+      <canvas id="l2hist" style="height:170px" aria-label="估计误差的直方图"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="border-color:var(--est-soft);border-top-width:8px"></span>K* 处的估计误差</span>
+        <span class="lg"><span class="sw" style="border-color:var(--pred)"></span>只信预测（K = 0）时的误差</span>
+      </div>
+    </section>
+    <ul>
+      <li>四种分布的实验点都贴着同一条抛物线，最优 <span class="m"><i>K</i></span> 也一样。<strong>线性最小方差的结论不依赖高斯假设。</strong></li>
+      <li>但直方图的形状跟着噪声变。切到「重尾」：绝大多数误差很小，少数却非常大。方差公式照样成立，可这种时候，能识别并丢掉野值的非线性方法可以做得更好。这是进阶篇鲁棒滤波要解决的问题。</li>
+    </ul>
+
+    <div class="callout">
+      <span class="cl">只用了三条假设</span>
+      <p>预测误差和读数噪声的均值都是 0；它们的方差 P⁻ 和 R 已知；两者不相关。<strong>没有用到高斯。</strong>这样得到的估计叫<strong>线性最小方差估计</strong>：在预测和读数的所有线性组合里，它的误差方差最小。顺便一提，「不相关」是比「独立」更弱的条件。</p>
+      <p>「两者不相关」不是凭空假设的，它来自第 1 课的三条假设：预测误差是由初始误差、到目前为止的过程噪声和<em>之前</em>的量测噪声累积而成的，而这一步的量测噪声和它们全都不相关。第 3 课推导递推公式时会逐条用到。</p>
+    </div>
+
+    <div class="kcard" data-route="1"></div>
+
+    <h2>对应到卡尔曼滤波</h2>
+    <p>给每个量加上时间下标 <span class="m"><i>k</i></span>，这一课的结果就是卡尔曼滤波「更新」的三步。下一课把它和「预测」的两步串成完整的循环。</p>
+    <div class="eqs" id="l2update"></div>
+
+    <h2>自己跑一遍</h2>
+    <p>用四种形状完全不同的噪声各做 10 万次实验，验证方差曲线和最优 <span class="m"><i>K</i></span> 都与分布形状无关。</p>
+    <div class="code" data-code>
+      <div class="code-head"><button class="tab" type="button" data-lang="py" aria-selected="true">Python</button><button class="tab" type="button" data-lang="m" aria-selected="false">MATLAB</button><span class="hint">MATLAB 需要 R2018b 以上</span><button class="btn copy" type="button">复制</button></div>
+<pre data-lang="py"><code class="language-python">import numpy as np
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC']
+plt.rcParams['axes.unicode_minus'] = False
+
+P_pred, R = 2.0**2, 1.0**2        # 预测误差的方差、读数噪声的方差
+n = 100_000                       # 每种噪声做 10 万次实验
+rng = np.random.default_rng()
+
+def unit_noise(kind, size):
+    """均值为 0、方差为 1，但形状各不相同的几种噪声"""
+    if kind == '高斯':
+        return rng.standard_normal(size)
+    if kind == '均匀':
+        return rng.uniform(-np.sqrt(3), np.sqrt(3), size)
+    if kind == '双峰':
+        return rng.choice([-0.9, 0.9], size) + np.sqrt(0.19) * rng.standard_normal(size)
+    if kind == '重尾':            # 95% 的时候噪声很小，5% 的时候放大 10 倍
+        big = rng.random(size) &lt; 0.05
+        return rng.standard_normal(size) * np.where(big, 10, 1) / np.sqrt(5.95)
+
+K_grid = np.linspace(0, 1, 21)
+K_star = P_pred / (P_pred + R)    # 推导出来的最优增益
+plt.plot(K_grid, (1 - K_grid)**2 * P_pred + K_grid**2 * R, 'k', label='理论 P(K)')
+for kind in ['高斯', '均匀', '双峰', '重尾']:
+    e_pred = np.sqrt(P_pred) * unit_noise(kind, n)   # 预测误差
+    v = np.sqrt(R) * unit_noise(kind, n)             # 读数噪声
+    var = [np.mean(((1 - K) * e_pred + K * v)**2) for K in K_grid]
+    plt.plot(K_grid, var, 'o', ms=4, label=kind)
+    best = np.mean(((1 - K_star) * e_pred + K_star * v)**2)
+    print(f'{kind}: 在 K* 处实测方差 = {best:.3f}')
+print(f'理论：K* = {K_star:.2f}，最小方差 = {(1 - K_star) * P_pred:.3f}')
+plt.axvline(K_star, color='gray', ls=':')
+plt.xlabel('K'); plt.ylabel('估计误差的方差'); plt.legend(); plt.show()</code></pre>
+<pre data-lang="m" hidden><code class="language-matlab">P_pred = 2^2; R = 1^2;            % 预测误差的方差、读数噪声的方差
+n = 1e5;                          % 每种噪声做 10 万次实验
+
+K_grid = linspace(0, 1, 21);
+K_star = P_pred / (P_pred + R);   % 推导出来的最优增益
+cols = [0.16 0.34 0.81; 0.69 0.45 0.03; 0.76 0.21 0.42; 0.25 0.55 0.35];   % 四种噪声各用一种颜色
+marks = {'o', 's', '^', 'd'};
+figure('Color', 'w', 'Position', [100 100 780 440]); hold on;
+plot(K_grid, (1 - K_grid).^2 * P_pred + K_grid.^2 * R, 'k-', 'LineWidth', 2);
+kinds = {'高斯', '均匀', '双峰', '重尾'};
+for i = 1:numel(kinds)
+    e_pred = sqrt(P_pred) * unit_noise(kinds{i}, n);   % 预测误差
+    v = sqrt(R) * unit_noise(kinds{i}, n);             % 读数噪声
+    vars = arrayfun(@(K) mean(((1 - K) * e_pred + K * v).^2), K_grid);
+    plot(K_grid, vars, marks{i}, 'Color', cols(i, :), 'MarkerSize', 7, 'LineWidth', 1.2);
+    best = mean(((1 - K_star) * e_pred + K_star * v).^2);
+    fprintf('%s: 在 K* 处实测方差 = %.3f\n', kinds{i}, best);
+end
+fprintf('理论：K* = %.2f，最小方差 = %.3f\n', K_star, (1 - K_star) * P_pred);
+yl = ylim;
+plot([K_star K_star], yl, ':', 'Color', [.5 .5 .5], 'LineWidth', 1.2);
+text(K_star, yl(2), sprintf('  K* = %.2f', K_star), 'VerticalAlignment', 'top', 'FontSize', 12);
+hold off; grid on; box off; set(gca, 'FontSize', 12);
+legend([{'理论 P(K)'}, kinds], 'Location', 'north', 'Box', 'off');
+xlabel('K'); ylabel('估计误差的方差 (m^2)'); title('四种噪声，同一条抛物线');
+
+function w = unit_noise(kind, n)
+    % 均值为 0、方差为 1，但形状各不相同的几种噪声
+    switch kind
+        case '高斯'
+            w = randn(n, 1);
+        case '均匀'
+            w = (2 * rand(n, 1) - 1) * sqrt(3);
+        case '双峰'
+            w = 0.9 * sign(rand(n, 1) - 0.5) + sqrt(0.19) * randn(n, 1);
+        case '重尾'               % 95% 的时候噪声很小，5% 的时候放大 10 倍
+            big = rand(n, 1) &lt; 0.05;
+            w = randn(n, 1) .* (1 + 9 * big) / sqrt(5.95);
+    end
+end</code></pre>
+    </div>
+
+    <nav class="pager" aria-label="翻页">
+      <a href="#lesson-1"><small>上一课</small>← 第 1 课 · 为什么要滤波</a>
+      <a class="next" href="#lesson-3"><small>下一课</small>第 3 课 · 单步跑一遍 →</a>
+    </nav>
+  </article>
+
+  <!-- ======================= LESSON 3 ======================= -->
+  <article class="lesson" id="lesson-3" hidden>
+    <header class="lesson-head">
+      <span class="eyebrow">第 3 课 · 约 20 分钟</span>
+      <h1>单步跑一遍</h1>
+      <p class="lede">把前两课拼起来：<span class="pr">预测</span>让不确定性变大，<span class="ob">观测</span>让它变小，一步接一步地循环。下面这辆小车会陪你把五个公式挨个算一遍。</p>
+    </header>
+
+    <h2>两个阶段：预测和更新</h2>
+    <p>卡尔曼滤波的每一步都分成两个阶段，交替进行。</p>
+    <p><strong class="pr">预测</strong>（也叫时间更新）：第 k 步的读数还没到。只靠运动模型，把上一步的估计往前推到当前时刻，得到<strong>先验估计</strong> <span class="m" id="l3sym1"></span> 和它的误差方差 <span class="m" id="l3sym2"></span>。上标 − 的意思是「还没用上第 k 步的读数」。小车在这段时间里又受了一次扰动，所以不确定性<strong>变大</strong>。</p>
+    <p><strong class="ob">更新</strong>（也叫量测更新）：读数 <span class="m" id="l3sym3"></span> 到了。用它修正先验估计，得到<strong>后验估计</strong> <span class="m" id="l3sym4"></span> 和它的误差方差 <span class="m" id="l3sym5"></span>。用上了新的信息，所以不确定性<strong>变小</strong>。</p>
+    <div class="tbl">
+      <table class="sym">
+        <thead><tr><th>阶段</th><th>用到的信息</th><th>输入</th><th>输出</th><th>不确定性</th></tr></thead>
+        <tbody id="l3stage"></tbody>
+      </table>
+    </div>
+    <p>后验估计接着成为下一步预测的起点，如此循环。有的教材和论文把先验、后验写成 <span class="m"><i>x̂</i><sub><i>k</i>|<i>k</i>−1</sub></span> 和 <span class="m"><i>x̂</i><sub><i>k</i>|<i>k</i></sub></span>，竖线后面表示「用到了截至哪一步的读数」，意思相同。</p>
+    <section class="fig wide" aria-label="误差方差的锯齿">
+      <div class="fig-title"><b>误差方差的锯齿</b><span>前 12 步：预测让它升高，更新让它降低</span></div>
+      <canvas id="l3saw" style="height:210px" aria-label="误差方差随预测和更新交替变化"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="border-color:var(--pred)"></span>预测：P⁻ = P + Q，升高</span>
+        <span class="lg"><span class="sw" style="border-color:var(--obs)"></span>更新：P = (1 − K)P⁻，降低</span>
+        <span class="lg"><span class="sw" style="border-color:var(--est)"></span>两次读数之间</span>
+      </div>
+      <p class="distnote">参数沿用下面「一步一步算」里的设置。升高和降低的幅度很快变得相等，这时方差不再变化，滤波器进入稳态。</p>
+    </section>
+
+    <h2>五个公式</h2>
+    <p>写成公式，一维卡尔曼滤波一共五个式子。前两个是<strong class="pr">预测</strong>，后三个是<strong class="ob">更新</strong>。</p>
+    <div class="eqs" id="l3five"></div>
+
+    <h2>推导：预测</h2>
+    <ol class="steps" id="l3stepsA"></ol>
+
+    <h2>推导：更新</h2>
+    <ol class="steps" id="l3stepsB"></ol>
+
+    <h2>初始化</h2>
+    <ol class="steps" id="l3stepsC"></ol>
+
+    <h2>一步一步算</h2>
+    <p>按「下一小步」，每按一次只算一个公式。图上的曲线会跟着变化，公式里代入的是这一刻的真实数字。图里用钟形曲线示意不确定性的大小，但卡尔曼滤波本身并不要求噪声是高斯的，高斯假设到底起什么作用，第 4 课细讲。</p>
+    <section class="fig wide" aria-label="交互：逐步运行卡尔曼滤波">
+      <div class="now" aria-live="polite"><span class="tagbig" id="l3where"></span><p id="l3say"></p></div>
+      <canvas id="l3c" style="height:280px" aria-label="当前一步的预测、观测和估计"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw dash" style="border-color:var(--est)"></span>上一步的估计</span>
+        <span class="lg"><span class="sw" style="border-color:var(--pred)"></span>预测</span>
+        <span class="lg"><span class="sw" style="border-color:var(--obs)"></span>这一步的读数</span>
+        <span class="lg"><span class="sw" style="border-color:var(--est);border-top-width:4px"></span>这一步的估计</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--ink-3)"></span>真实位置（滤波器看不到）</span>
+      </div>
+      <div class="bar">
+        <button class="btn primary" id="l3next" type="button">下一小步</button>
+        <button class="btn" id="l3full" type="button">算完这一步</button>
+        <button class="btn" id="l3auto" type="button" aria-pressed="false">自动播放</button>
+        <button class="btn" id="l3ff" type="button" aria-pressed="false">快进到底</button>
+        <button class="btn" id="l3reset" type="button">回到第 1 步</button>
+        <span class="kpos" id="l3k"></span>
+      </div>
+      <p class="init" id="l3init"></p>
+      <div class="stepper" id="l3stepper"></div>
+      <div class="ctrls">
+        <div class="field es"><div class="frow"><label for="l3x0">初始估计 x̂₀</label><span class="val" id="l3x0v"></span></div><input type="range" id="l3x0" min="-10" max="10" step="0.5" value="3"></div>
+        <div class="field es"><div class="frow"><label for="l3s0">初始误差的标准差 √P₀</label><span class="val" id="l3s0v"></span></div><input type="range" id="l3s0" min="0.1" max="10" step="0.1" value="3"></div>
+      </div>
+      <div class="bar"><span class="frow">初值设定</span><span class="bar" id="l3init-presets" role="group" aria-label="初值设定"></span></div>
+      <div class="ctrls">
+        <div class="field pr"><div class="frow"><label for="l3sw">运动扰动 σ<sub>w</sub>（Q = σ<sub>w</sub>²）</label><span class="val" id="l3swv"></span></div><input type="range" id="l3sw" min="0.05" max="1.2" step="0.05" value="0.5"></div>
+        <div class="field ob"><div class="frow"><label for="l3sr">传感器噪声 σ<sub>R</sub>（R = σ<sub>R</sub>²）</label><span class="val" id="l3srv"></span></div><input type="range" id="l3sr" min="0.5" max="5" step="0.1" value="2"></div>
+      </div>
+      <div class="strips">
+        <div class="strip"><span class="cap">估计误差 <span class="es">x̂ − x</span>，阴影是 ±2√P；红点是读数误差</span><canvas id="l3err" style="height:140px" aria-label="估计误差随时间"></canvas></div>
+        <div class="strip"><span class="cap">卡尔曼增益 K，虚线是稳态值 K∞</span><canvas id="l3gain" style="height:140px" aria-label="增益随时间"></canvas></div>
+      </div>
+    </section>
+
+    <h2>看出了什么</h2>
+    <ul>
+      <li>点「初值错了，还很自信」：初值差了 6 米，√P₀ 却只有 0.3 米。开头几步 K 很小，滤波器固执地相信错误的初值，<span class="es">蓝线</span>开头一段都跑在 ±2√P 的阴影外面，要过十来步才被读数拉回来。再点「完全不知道起点」：第一步 K 接近 1，估计立刻跳到读数附近。<strong>初值可以错，但 P₀ 要诚实。</strong></li>
+      <li>不管初值怎么设，P 和 K 都会忘掉 P₀，收敛到同一个稳态值。初值只影响开头那一段。</li>
+      <li><span class="m"><i>P</i></span> 和 <span class="m"><i>K</i></span> 的计算只用到 <span class="m"><i>Q</i></span>、<span class="m"><i>R</i></span> 和初值，和读数 <span class="m ob"><i>z</i></span> 无关，所以它们可以提前算好。它们收敛得很快，现在的参数下 <span class="m"><i>K</i></span> 稳定在 <b id="l3kinf"></b> 左右。</li>
+      <li>收敛之后，卡尔曼滤波就是一个固定权重的加权平均：每一步从<span class="pr">预测</span>往<span class="ob">读数</span>的方向挪 <b id="l3kpct"></b>。</li>
+      <li><span class="es">蓝线</span>大部分时间待在 ±2√P 的阴影里，说明滤波器对自己误差的估计是诚实的。进阶篇会把「诚实」变成一个可以检验的指标。</li>
+      <li>把 σ<sub>R</sub> 调大：<span class="m"><i>K</i></span> 变小，估计更平滑，但对真实变化的反应也更慢。第 7 课会从频率的角度重新看这个权衡。</li>
+    </ul>
+
+    <h2>选读：稳态增益怎么算</h2>
+    <ol class="steps" id="l3ss"></ol>
+
+    <h2>自己跑一遍</h2>
+    <p>完整的一维卡尔曼滤波，五行核心代码和上面五个公式一一对应。</p>
+    <div class="code" data-code>
+      <div class="code-head"><button class="tab" type="button" data-lang="py" aria-selected="true">Python</button><button class="tab" type="button" data-lang="m" aria-selected="false">MATLAB</button><span class="hint">和第 1 课同一辆小车</span><button class="btn copy" type="button">复制</button></div>
+<pre data-lang="py"><code class="language-python">import numpy as np
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC']
+plt.rcParams['axes.unicode_minus'] = False
+
+# 和第 1 课同一辆小车
+N, dt, u = 200, 1.0, 1.0
+Q, R = 0.5**2, 2.0**2
+rng = np.random.default_rng()
+
+x_true = np.zeros(N)
+for k in range(1, N):
+    x_true[k] = x_true[k-1] + u*dt + rng.normal(0, np.sqrt(Q))
+z = x_true + rng.normal(0, np.sqrt(R), N)   # z[0] 不用，第一次读数在 k = 1
+
+# 卡尔曼滤波
+x_hat = np.zeros(N)
+P = np.zeros(N)
+K = np.zeros(N)
+# 初始化：给定初始估计和初始误差方差
+x0_hat, P0 = 3.0, 3.0**2          # 真实起点是 0，我们猜 3 m，并承认可能差 3 m 左右
+x_hat[0], P[0] = x0_hat, P0       # 对起点一无所知时，把 P0 设得很大（比如 1e6）
+for k in range(1, N):
+    # 预测
+    x_pred = x_hat[k-1] + u*dt                  # ① 往前推一步
+    P_pred = P[k-1] + Q                         # ② 不确定性变大
+    # 更新
+    K[k] = P_pred / (P_pred + R)                # ③ 算卡尔曼增益
+    x_hat[k] = x_pred + K[k] * (z[k] - x_pred)  # ④ 用读数修正
+    P[k] = (1 - K[k]) * P_pred                  # ⑤ 不确定性变小
+
+print(f'卡尔曼滤波 RMSE = {np.sqrt(np.mean((x_hat - x_true)**2)):.2f} m')
+print(f'传感器读数 RMSE = {np.sqrt(np.mean((z - x_true)**2)):.2f} m')
+print(f'最后的增益 K = {K[-1]:.3f}')
+
+t = np.arange(N)
+fig, (a1, a2) = plt.subplots(2, 1, sharex=True)
+a1.fill_between(t, -2*np.sqrt(P), 2*np.sqrt(P), alpha=0.2, label='±2√P')
+a1.plot(t, x_hat - x_true, label='估计误差')
+a1.plot(t, z - x_true, '.', label='读数误差')
+a1.set_ylabel('误差 (m)'); a1.legend()
+a2.plot(t[1:], K[1:])
+a2.set_ylabel('K'); a2.set_xlabel('k（步）')
+plt.show()</code></pre>
+<pre data-lang="m" hidden><code class="language-matlab">% 和第 1 课同一辆小车
+N = 200; dt = 1; u = 1;
+Q = 0.5^2; R = 2^2;
+
+x_true = zeros(1, N);
+for k = 2:N
+    x_true(k) = x_true(k-1) + u*dt + sqrt(Q)*randn;
+end
+z = x_true + sqrt(R)*randn(1, N);   % z(1) 不用，第一次读数在 k = 1
+
+% 卡尔曼滤波
+x_hat = zeros(1, N); P = zeros(1, N); K = zeros(1, N);
+% 初始化：给定初始估计和初始误差方差（MATLAB 下标 1 对应 k = 0）
+x0_hat = 3; P0 = 3^2;             % 真实起点是 0，我们猜 3 m，并承认可能差 3 m 左右
+x_hat(1) = x0_hat; P(1) = P0;     % 对起点一无所知时，把 P0 设得很大（比如 1e6）
+for k = 2:N
+    % 预测
+    x_pred = x_hat(k-1) + u*dt;                 % ① 往前推一步
+    P_pred = P(k-1) + Q;                        % ② 不确定性变大
+    % 更新
+    K(k) = P_pred / (P_pred + R);               % ③ 算卡尔曼增益
+    x_hat(k) = x_pred + K(k) * (z(k) - x_pred); % ④ 用读数修正
+    P(k) = (1 - K(k)) * P_pred;                 % ⑤ 不确定性变小
+end
+
+fprintf('卡尔曼滤波 RMSE = %.2f m\n', sqrt(mean((x_hat - x_true).^2)));
+fprintf('传感器读数 RMSE = %.2f m\n', sqrt(mean((z - x_true).^2)));
+fprintf('最后的增益 K = %.3f\n', K(end));
+
+% 画图：颜色和网页一致，蓝 = 估计，红 = 读数
+cEst = [0.16 0.34 0.81]; cObs = [0.76 0.21 0.42];
+t = 0:N-1;
+figure('Color', 'w', 'Position', [100 100 780 560]);
+subplot(2, 1, 1); hold on;
+fill([t, fliplr(t)], [2*sqrt(P), fliplr(-2*sqrt(P))], cEst, 'FaceAlpha', 0.15, 'EdgeColor', 'none');
+plot(t(2:end), z(2:end) - x_true(2:end), '.', 'Color', cObs, 'MarkerSize', 10);
+plot(t, x_hat - x_true, '-', 'Color', cEst, 'LineWidth', 2);
+plot([0 N-1], [0 0], '-', 'Color', [.6 .6 .6], 'HandleVisibility', 'off');
+hold off; grid on; box off; set(gca, 'FontSize', 12); xlim([0 N-1]);
+legend('±2√P', '读数误差', '估计误差', 'Location', 'northeast', 'Box', 'off');
+ylabel('误差 (m)'); title('估计误差与滤波器自己估计的 ±2√P');
+subplot(2, 1, 2);
+plot(t(2:end), K(2:end), '-', 'Color', [.1 .1 .1], 'LineWidth', 2);
+grid on; box off; set(gca, 'FontSize', 12); xlim([0 N-1]); ylim([0 1]);
+ylabel('卡尔曼增益 K'); xlabel('k（步）');</code></pre>
+    </div>
+
+    <h2>检查点：学到这里可以停一下</h2>
+    <p>前三课是主干：为什么要滤波，权重怎么选，预测和更新怎么循环。先用一道小题检查一下。</p>
+    <div class="callout">
+      <span class="cl">小题</span>
+      <p>预测位置是 10 m，读数是 12 m。</p>
+      <p>（1）如果预测和读数一样可靠，更新后的估计在哪？</p>
+      <p>（2）如果传感器比预测更准，估计会往哪边移？为什么？</p>
+    </div>
+    <details class="answer">
+      <summary>看答案</summary>
+      <p>（1）一样可靠就是 P⁻ = R，所以 K = P⁻ / (P⁻ + R) = 0.5，估计是 10 + 0.5 × (12 − 10) = 11 m，正好在中间。更新后的方差是 (1 − K)P⁻，只有原来的一半。</p>
+      <p>（2）传感器更准就是 R 更小，K 更接近 1，估计更靠近读数 12 m。比如 R 只有 P⁻ 的三分之一时，K = 0.75，估计是 11.5 m。极端情况 R 趋于 0 时 K 趋于 1，直接采信读数。</p>
+    </details>
+    <p>能算出第一问、说清第二问的道理，主干就掌握了，已经可以把第 3 课的代码拿去用。</p>
+    <p>后面几课不引入新的算法，而是从不同的角度重新理解同一个公式，数学要求比前三课高，可以按兴趣选读：第 4 课用到概率密度和一点积分，第 5 课接着第 4 课讲，第 6 课（几何视角）和第 7 课（工程视角）即将上线。</p>
+
+    <nav class="pager" aria-label="翻页">
+      <a href="#lesson-2"><small>上一课</small>← 第 2 课 · 权重该怎么选</a>
+      <a class="next" href="#lesson-4"><small>下一课</small>第 4 课 · 贝叶斯视角 →</a>
+    </nav>
+  </article>
+
+  <!-- ======================= LESSON 4 ======================= -->
+  <article class="lesson" id="lesson-4" hidden>
+    <header class="lesson-head">
+      <span class="eyebrow">第 4 课 · 视角 · 贝叶斯 · 约 30 分钟</span>
+      <h1>贝叶斯视角：高斯给了我们什么</h1>
+      <p class="lede">前三课只追踪两个数：估计是多少，方差有多大。这一课换一种更完整的描述，直接追踪「小车在每个位置的可能性有多大」，也就是整个概率分布。这条路推出的还是同一组公式，但它能回答一个前面回答不了的问题：卡尔曼滤波到底是不是最好的？</p>
+    </header>
+
+    <h2>用一条曲线表示「我知道多少」</h2>
+    <p>我们对小车位置的认识，可以画成一条曲线 <span class="m"><i>p</i>(<i>x</i>)</span>，叫概率密度：曲线在哪里高，小车就更可能在哪里；曲线下的总面积永远是 1。曲线越窄越高，说明越有把握。</p>
+    <p>最常用的是高斯分布 <span class="m"><i>N</i>(<i>μ</i>, <i>σ</i><sup>2</sup>)</span>，也就是钟形曲线：<span class="m"><i>μ</i></span> 是最可能的位置，<span class="m"><i>σ</i></span> 是不确定的程度。它只用两个数就能完全确定，这一点后面会起决定性的作用。</p>
+
+    <h2>贝叶斯公式：读数怎样改变认识</h2>
+    <p>读数到来之前，我们已经有一个认识，来自预测。读数到来之后，认识应该怎么变？贝叶斯公式给出了唯一合理的答案。它涉及三条曲线：</p>
+    <ul>
+      <li><strong class="pr">先验</strong> <span class="m"><i>p</i>(<i>x</i>)</span>：读数到来之前的认识。在滤波里，它就是预测的结果。</li>
+      <li><strong class="ob">似然</strong> <span class="m"><i>p</i>(<i>z</i> | <i>x</i>)</span>：假如小车真的在 <span class="m"><i>x</i></span>，读到 <span class="m"><i>z</i></span> 的可能性有多大。因为 <span class="m"><i>z</i> = <i>x</i> + <i>v</i></span>，读到 <span class="m"><i>z</i></span> 就意味着噪声恰好等于 <span class="m"><i>z</i> − <i>x</i></span>，所以似然就是噪声的密度在 <span class="m"><i>z</i> − <i>x</i></span> 处的值。</li>
+      <li><strong class="es">后验</strong> <span class="m"><i>p</i>(<i>x</i> | <i>z</i>)</span>：看到读数之后的认识。</li>
+    </ul>
+    <div class="eq"><div class="body m" id="l4bayes"></div><span class="tag">贝叶斯公式</span></div>
+    <p>这里有一个容易绕晕的地方：读数 <span class="m"><i>z</i></span> 已经是一个确定的数了，所以要把似然看成 <span class="m"><i>x</i></span> 的函数，它回答的是「哪些位置能解释这个读数」。噪声是高斯时，它是一条以读数为中心、宽度为 σ<sub>R</sub> 的钟形曲线。分母 <span class="m"><i>p</i>(<i>z</i>)</span> 和 <span class="m"><i>x</i></span> 无关，只负责把面积调回 1。</p>
+    <p>所以操作很简单：<strong>两条曲线逐点相乘，再归一化。</strong>相乘的道理是：一个位置要可信，必须既符合预测，又能解释读数。只要有一方认为它几乎不可能，乘积就接近 0。</p>
+
+    <section class="fig wide" aria-label="交互：先验乘以似然">
+      <canvas id="l4c" style="height:300px" aria-label="先验、似然和后验三条高斯曲线"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="border-color:var(--pred)"></span>先验（预测）N(μ₁, σ₁²)</span>
+        <span class="lg"><span class="sw" style="border-color:var(--obs)"></span>似然（读数）N(μ₂, σ₂²)</span>
+        <span class="lg"><span class="sw" style="border-color:var(--est);border-top-width:4px"></span>后验 N(μ, σ²)</span>
+      </div>
+      <div class="ctrls">
+        <div class="field pr"><div class="frow"><label for="l4m1">预测位置 μ₁</label><span class="val" id="l4m1v"></span></div><input type="range" id="l4m1" min="0" max="20" step="0.1" value="10"></div>
+        <div class="field pr"><div class="frow"><label for="l4s1">预测的标准差 σ₁</label><span class="val" id="l4s1v"></span></div><input type="range" id="l4s1" min="0.3" max="5" step="0.05" value="2"></div>
+        <div class="field ob"><div class="frow"><label for="l4m2">读数 μ₂</label><span class="val" id="l4m2v"></span></div><input type="range" id="l4m2" min="0" max="20" step="0.1" value="12"></div>
+        <div class="field ob"><div class="frow"><label for="l4s2">读数的标准差 σ₂</label><span class="val" id="l4s2v"></span></div><input type="range" id="l4s2" min="0.3" max="5" step="0.05" value="1"></div>
+      </div>
+      <div class="bar" id="l4presets"></div>
+      <div class="livepanel" aria-live="polite">
+        <div class="row m" id="l4eqK"></div>
+        <div class="row m" id="l4eqMu"></div>
+        <div class="row m" id="l4eqVar"></div>
+        <p class="note" id="l4note"></p>
+      </div>
+    </section>
+
+    <h2>看出了什么</h2>
+    <ul>
+      <li><span class="es">后验</span>永远比先验和似然都窄：用上读数之后，总是更有把握。</li>
+      <li><span class="es">后验</span>的峰落在两者之间，靠向更窄、更准的那一条。两条一样宽时正好取中点。</li>
+      <li>两条高斯曲线相乘，结果看起来还是一条钟形曲线。这不是巧合，下面就来证明。</li>
+    </ul>
+
+    <h2>推导：更新就是两个高斯相乘</h2>
+    <ol class="steps" id="l4steps"></ol>
+
+    <h2>预测在贝叶斯里是什么</h2>
+    <p>更新是「相乘」，那预测呢？预测要回答的是：已知上一步小车位置的分布，再走一步之后，位置的分布是什么？</p>
+    <ol class="steps" id="l4pred"></ol>
+
+    <h2>所以，卡尔曼滤波是什么</h2>
+    <p>预测用全概率公式，更新用贝叶斯公式，两步交替进行，这套做法叫<strong>贝叶斯滤波</strong>。它对任何分布、任何模型都成立，是最一般的答案：一般情形下，预测要按状态转移概率，把上一步各种可能状态的贡献加起来；在本例中，因为小车只是平移再叠加一个扰动，这一步恰好是卷积。麻烦在于，一般情况下分布的形状会越变越复杂，没法用有限的几个数存下来。</p>
+    <p>线性模型加高斯噪声是一个特例。在这个特例里：</p>
+    <div class="tbl">
+      <table class="sym">
+        <thead><tr><th>阶段</th><th>贝叶斯滤波（一般情形）</th><th>线性 + 高斯时</th></tr></thead>
+        <tbody>
+          <tr><td><strong class="pr">预测</strong></td><td>按状态转移概率，把上一步各种可能状态的贡献加起来（本例中是平移再卷积）</td><td>高斯卷积高斯还是高斯：均值加 uΔt，方差加 Q</td></tr>
+          <tr><td><strong class="ob">更新</strong></td><td>先验乘以似然，再归一化</td><td>高斯乘高斯还是高斯：均值和方差按 ③ ④ ⑤ 变化</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>只要初始分布是高斯，之后每一步的分布就永远是高斯。而高斯分布只需要均值和方差两个数就能完全确定，所以我们不必追踪整条曲线，只追踪这两个数就够了。这两个数的递推公式，正是第 3 课的五个公式。</p>
+    <div class="callout">
+      <span class="cl">这一课的核心结论</span>
+      <p>卡尔曼滤波是贝叶斯滤波在「线性模型 + 高斯噪声」下的精确解。第 3 课图里的钟形曲线，在高斯假设下就是真正的后验分布，不只是示意。</p>
+    </div>
+    <div class="kcard" data-route="2"></div>
+
+    <h2>为什么报后验的均值：最小均方误差估计</h2>
+    <p>后验是一整条曲线，可我们最终要报一个数。报哪个？这取决于怎么评价「报得好不好」。最常用的标准是<strong>均方误差</strong>：误差的平方的平均值。它越小越好；让它最小的估计叫最小均方误差估计，英文缩写 MMSE。均方根误差 RMSE 是它的平方根，让其中一个最小，另一个也最小。</p>
+    <p>先动手试一下。下面蓝色曲线是某一次读数之后的后验。拖动滑块选一个要报的数 a，看它的均方误差是多少。</p>
+    <section class="fig wide" aria-label="交互：报哪个数，均方误差最小">
+      <div class="bar" id="l4mshapes" role="group" aria-label="后验的形状"></div>
+      <div class="fig-title"><b>后验分布，和你报的数 a</b><span>三角是后验均值，菱形是曲线的最高点</span></div>
+      <canvas id="l4mm1" style="height:190px" aria-label="后验分布和所报的数"></canvas>
+      <div class="fig-title"><b>报 a 时的均方误差 MSE(a)</b><span>它是一条抛物线</span></div>
+      <canvas id="l4mm2" style="height:200px" aria-label="均方误差随所报的数变化"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="border-color:var(--ink)"></span>MSE(a) = E[(x − a)² | z]</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--est)"></span>后验方差：怎么报都躲不掉的部分</span>
+        <span class="lg"><span class="sw" style="border-color:var(--obs);border-top-width:4px"></span>(m − a)²：报偏了多付的代价</span>
+      </div>
+      <div class="ctrls">
+        <div class="field"><div class="frow"><label for="l4ma">要报的数 a</label><span class="val" id="l4mav"></span></div><input type="range" id="l4ma" min="2" max="18" step="0.05" value="7"></div>
+      </div>
+      <div class="bar"><button class="btn" id="l4mmean" type="button">报后验均值</button><button class="btn" id="l4mpeak" type="button">报曲线最高点</button></div>
+      <div class="readout">
+        <div class="ro" style="border-color:var(--ink)"><span>均方误差 MSE(a)</span><b id="l4mr1"></b></div>
+        <div class="ro" style="border-color:var(--est)"><span>后验方差</span><b id="l4mr2"></b></div>
+        <div class="ro" style="border-color:var(--obs)"><span>(m − a)²</span><b id="l4mr3"></b></div>
+        <div class="ro" style="border-color:var(--est)"><span>后验均值 m</span><b id="l4mr4"></b></div>
+      </div>
+    </section>
+    <ul>
+      <li>不管后验是什么形状，MSE(a) 都是一条抛物线，最低点正好在后验均值 m 处，最低点的高度正好是后验方差。</li>
+      <li>任何时候都有：均方误差 = 后验方差 + (m − a)²。第一部分来自小车位置本身的不确定，报什么数都躲不掉；第二部分是报偏了多付的代价，报均值时它为 0。</li>
+      <li>切到「偏斜」：曲线的最高点不在均值处。报最高点，也就是「最可能的位置」，均方误差反而更大。</li>
+      <li>切到「双峰」：均值落在两个峰之间，那里小车几乎不可能出现，可它仍然是均方误差最小的选择。这也提醒我们，后验有两个峰时，只报一个数本身就不够。</li>
+    </ul>
+
+    <h2>推导：为什么是均值</h2>
+    <ol class="steps" id="l4mmse"></ol>
+    <div class="callout">
+      <span class="cl">换一个评价标准，答案会变</span>
+      <p>均值是「平方误差」这个标准下的最优。如果改成让误差绝对值的平均最小，最优的是后验的中位数；如果想报「最可能的位置」，就是曲线的最高点，叫极大后验估计（MAP），下一课专门讲它。高斯分布左右对称、只有一个峰，这三个数重合，所以高斯时不用纠结选哪个标准。</p>
+    </div>
+
+    <h2>噪声不是高斯时会怎样</h2>
+    <p>贝叶斯公式并不要求高斯。下面保持先验是高斯，只把读数噪声换成别的分布，方差保持不变。这时没有现成的公式，就用数值方法把两条曲线逐点相乘。再把卡尔曼滤波给出的结果画在一起，看两者差在哪。</p>
+    <section class="fig wide" aria-label="交互：非高斯噪声下的真正后验">
+      <div class="bar" id="l4bdists" role="group" aria-label="读数噪声的分布"></div>
+      <div class="fig-title"><b>真正的后验，和卡尔曼滤波给出的高斯</b><span>先验固定在 10 m</span></div>
+      <canvas id="l4b" style="height:250px" aria-label="先验、似然、真正的后验和卡尔曼滤波的高斯"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="border-color:var(--pred)"></span>先验</span>
+        <span class="lg"><span class="sw" style="border-color:var(--obs)"></span>似然</span>
+        <span class="lg"><span class="sw" style="border-color:var(--est);border-top-width:4px"></span>真正的后验</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--ink)"></span>卡尔曼滤波给出的高斯</span>
+      </div>
+      <div class="fig-title"><b>估计值怎样随读数变化</b><span>横轴是读数 z，纵轴是估计</span></div>
+      <canvas id="l4map" style="height:230px" aria-label="估计值随读数的变化"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw" style="border-color:var(--est);border-top-width:4px"></span>后验均值（所有估计里最优）</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--ink)"></span>卡尔曼滤波（所有直线里最优）</span>
+        <span class="lg"><span class="sw" style="border-color:var(--rule)"></span>只信预测 / 只信读数</span>
+      </div>
+      <div class="ctrls">
+        <div class="field ob"><div class="frow"><label for="l4bz">读数 z</label><span class="val" id="l4bzv"></span></div><input type="range" id="l4bz" min="2" max="22" step="0.1" value="12"></div>
+        <div class="field pr"><div class="frow"><label for="l4bs1">预测的标准差 √P⁻</label><span class="val" id="l4bs1v"></span></div><input type="range" id="l4bs1" min="0.5" max="3" step="0.05" value="1"></div>
+        <div class="field ob"><div class="frow"><label for="l4bs2">读数噪声的标准差 √R</label><span class="val" id="l4bs2v"></span></div><input type="range" id="l4bs2" min="0.5" max="3" step="0.05" value="1"></div>
+      </div>
+      <div class="bar" id="l4bpresets"></div>
+      <div class="readout">
+        <div class="ro" style="border-color:var(--est)"><span>真正的后验均值</span><b id="l4br1"></b></div>
+        <div class="ro" style="border-color:var(--ink)"><span>卡尔曼滤波的估计</span><b id="l4br2"></b></div>
+        <div class="ro" style="border-color:var(--est)"><span>真正的后验标准差</span><b id="l4br3"></b></div>
+        <div class="ro" style="border-color:var(--ink)"><span>卡尔曼滤波报告的 √P</span><b id="l4br4"></b></div>
+      </div>
+    </section>
+    <ul>
+      <li><strong>高斯</strong>：两条曲线完全重合，下图里蓝线就是那条直线。噪声是高斯时，最优估计恰好是读数的线性函数。</li>
+      <li><strong>重尾</strong>，点「读数离谱」：真正的后验几乎留在预测附近，均值只有 10.45 m，而卡尔曼滤波被拽到了 14 m。贝叶斯公式自己「看出」了这个读数多半是野值：如果它是一次正常的读数，不可能离预测这么远，更可能是那 5% 的大噪声。</li>
+      <li>重尾时再看下图：读数离预测不远时，蓝线比直线更陡，比卡尔曼滤波更相信读数，因为正常的读数其实很准；读数离得太远时，蓝线反而折回预测。最优的估计是一条曲线，任何直线都做不到。</li>
+      <li><strong>均匀</strong>：后验在读数左右一定距离之外直接变成 0，读数给出了硬边界。<strong>双峰</strong>：后验可能出现两个峰，这时「一个均值加一个方差」已经描述不了它。</li>
+      <li>卡尔曼滤波的那条直线并没有错：它仍然是所有直线里均方误差最小的，这是第 2 课的结论。差距来自「只能用直线」这个限制。</li>
+    </ul>
+
+    <h2>高斯假设到底给了我们什么</h2>
+    <p>现在可以完整地回答了。推出公式不需要高斯假设，第 2 课已经证明过。高斯假设给的是三样别的东西：</p>
+    <ul>
+      <li><strong>更强的最优性。</strong>没有高斯假设：在所有<em>线性</em>估计里方差最小。有高斯假设：在<em>所有</em>估计里均方误差最小，任何非线性的办法都不可能更好。</li>
+      <li><strong>完整的分布。</strong>只知道方差时，能说的很有限：由切比雪夫不等式，误差落在 ±2σ 以内的概率至少是 75%。知道是高斯以后，这个概率就是 95%，可以给出准确的置信区间。</li>
+      <li><strong>两个数就够用。</strong>分布永远保持高斯，所以只存均值和方差，就没有丢掉任何信息。</li>
+    </ul>
+    <p>反过来，噪声明显不是高斯时，卡尔曼滤波仍然是最好的线性滤波器，但还有改进的空间。进阶篇的粒子滤波直接用数值方法近似整个后验；鲁棒滤波则专门对付重尾噪声和野值。</p>
+    <div class="callout">
+      <span class="cl">一句话</span>
+      <p>高斯假设不是推出卡尔曼滤波的前提，它决定的是这个公式有多好。</p>
+    </div>
+
+    <h2>自己跑一遍</h2>
+    <p>把位置离散成网格，直接用数值方法算贝叶斯公式，分三步验证：更新等于相乘，预测等于卷积，以及重尾噪声下真正的后验均值和卡尔曼滤波差多少。</p>
+    <div class="code" data-code>
+      <div class="code-head"><button class="tab" type="button" data-lang="py" aria-selected="true">Python</button><button class="tab" type="button" data-lang="m" aria-selected="false">MATLAB</button><span class="hint">需要 numpy、matplotlib</span><button class="btn copy" type="button">复制</button></div>
+<pre data-lang="py"><code class="language-python">import numpy as np
+import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans CJK SC']
+plt.rcParams['axes.unicode_minus'] = False
+
+g = lambda x, m, v: np.exp(-(x - m)**2 / (2*v)) / np.sqrt(2*np.pi*v)   # 高斯密度
+x = np.linspace(-10, 40, 5001)    # 把位置离散成网格，用数值方法直接算贝叶斯公式
+dx = x[1] - x[0]
+mean = lambda p: np.sum(x * p) * dx
+var = lambda p: np.sum((x - mean(p))**2 * p) * dx
+
+# 1. 更新 = 先验 × 似然，再归一化
+x_pred, P_pred = 10.0, 2.0**2     # 先验：预测
+z, R = 12.0, 1.0**2               # 读数
+post = g(x, x_pred, P_pred) * g(z - x, 0, R)
+post /= post.sum() * dx
+K = P_pred / (P_pred + R)
+print(f'更新  数值：均值 {mean(post):.3f}，方差 {var(post):.3f}')
+print(f'      公式：均值 {x_pred + K*(z - x_pred):.3f}，方差 {(1 - K)*P_pred:.3f}')
+
+# 2. 预测 = 平移 uΔt，再和过程噪声的分布做卷积
+u, Q = 1.0, 0.5**2
+kernel = g(np.arange(-3, 3 + dx/2, dx), 0, Q)
+pred = np.convolve(post, kernel, mode='same') * dx     # 卷积：被噪声“抹宽”
+print(f'预测  数值：均值 {mean(pred) + u:.3f}，方差 {var(pred):.3f}')
+print(f'      公式：均值 {mean(post) + u:.3f}，方差 {var(post) + Q:.3f}')
+
+# 3. 读数噪声不是高斯（重尾：95% 的时候很小，5% 的时候放大 10 倍），方差仍然是 R
+def heavy(v, R):
+    s2 = R / 5.95
+    return 0.95 * g(v, 0, s2) + 0.05 * g(v, 0, 100 * s2)
+x_pred, P_pred, R = 10.0, 1.0, 1.0
+K = P_pred / (P_pred + R)
+for z in [11.0, 18.0]:
+    post_h = g(x, x_pred, P_pred) * heavy(z - x, R)
+    post_h /= post_h.sum() * dx
+    print(f'重尾噪声，读数 z = {z:.0f}：真正的后验均值 {mean(post_h):.2f}，卡尔曼滤波给出 {x_pred + K*(z - x_pred):.2f}')
+
+plt.plot(x, g(x, x_pred, P_pred), label='先验（预测）')
+plt.plot(x, heavy(z - x, R), label='似然（重尾噪声）')
+plt.plot(x, post_h, lw=2, label='真正的后验')
+plt.plot(x, g(x, x_pred + K*(z - x_pred), (1 - K)*P_pred), '--', label='卡尔曼滤波给出的高斯')
+plt.xlim(5, 23); plt.xlabel('位置 x (m)'); plt.ylabel('概率密度'); plt.legend(); plt.show()</code></pre>
+<pre data-lang="m" hidden><code class="language-matlab">g = @(x, m, v) exp(-(x - m).^2 / (2*v)) / sqrt(2*pi*v);   % 高斯密度
+x = linspace(-10, 40, 5001);      % 把位置离散成网格，用数值方法直接算贝叶斯公式
+dx = x(2) - x(1);
+mean_of = @(p) sum(x .* p) * dx;
+var_of = @(p) sum((x - sum(x .* p) * dx).^2 .* p) * dx;
+
+% 1. 更新 = 先验 × 似然，再归一化
+x_pred = 10; P_pred = 2^2;        % 先验：预测
+z = 12; R = 1^2;                  % 读数
+post = g(x, x_pred, P_pred) .* g(z - x, 0, R);
+post = post / (sum(post) * dx);
+K = P_pred / (P_pred + R);
+fprintf('更新  数值：均值 %.3f，方差 %.3f\n', mean_of(post), var_of(post));
+fprintf('      公式：均值 %.3f，方差 %.3f\n', x_pred + K*(z - x_pred), (1 - K)*P_pred);
+
+% 2. 预测 = 平移 uΔt，再和过程噪声的分布做卷积
+u = 1; Q = 0.5^2;
+kernel = g(-3:dx:3, 0, Q);
+pred = conv(post, kernel, 'same') * dx;                 % 卷积：被噪声“抹宽”
+fprintf('预测  数值：均值 %.3f，方差 %.3f\n', mean_of(pred) + u, var_of(pred));
+fprintf('      公式：均值 %.3f，方差 %.3f\n', mean_of(post) + u, var_of(post) + Q);
+
+% 3. 读数噪声不是高斯（重尾：95% 的时候很小，5% 的时候放大 10 倍），方差仍然是 R
+heavy = @(v, R) 0.95 * g(v, 0, R / 5.95) + 0.05 * g(v, 0, 100 * R / 5.95);
+x_pred = 10; P_pred = 1; R = 1;
+K = P_pred / (P_pred + R);
+for z = [11, 18]
+    post_h = g(x, x_pred, P_pred) .* heavy(z - x, R);
+    post_h = post_h / (sum(post_h) * dx);
+    fprintf('重尾噪声，读数 z = %g：真正的后验均值 %.2f，卡尔曼滤波给出 %.2f\n', z, mean_of(post_h), x_pred + K*(z - x_pred));
+end
+
+% 画图：黄 = 先验，红 = 似然，蓝 = 真正的后验，黑色虚线 = 卡尔曼滤波
+cPred = [0.69 0.45 0.03]; cObs = [0.76 0.21 0.42]; cEst = [0.16 0.34 0.81];
+figure('Color', 'w', 'Position', [100 100 780 420]); hold on;
+plot(x, g(x, x_pred, P_pred), '-', 'Color', cPred, 'LineWidth', 1.5);
+plot(x, heavy(z - x, R), '-', 'Color', cObs, 'LineWidth', 1.5);
+area(x, post_h, 'FaceColor', cEst, 'FaceAlpha', 0.20, 'EdgeColor', cEst, 'LineWidth', 2.5);
+plot(x, g(x, x_pred + K*(z - x_pred), (1 - K)*P_pred), 'k--', 'LineWidth', 1.5);
+hold off; grid on; box off; set(gca, 'FontSize', 12); xlim([5 23]);
+legend('先验（预测）', '似然（重尾噪声）', '真正的后验', '卡尔曼滤波给出的高斯', 'Location', 'northeast', 'Box', 'off');
+xlabel('位置 x (m)'); ylabel('概率密度'); title('重尾噪声、读数离谱时：真正的后验与卡尔曼滤波');</code></pre>
+    </div>
+
+    <nav class="pager" aria-label="翻页">
+      <a href="#lesson-3"><small>上一课</small>← 第 3 课 · 单步跑一遍</a>
+      <a class="next" href="#lesson-5"><small>下一课</small>第 5 课 · 极大后验视角 →</a>
+    </nav>
+  </article>
+
+  <!-- ======================= LESSON 5 ======================= -->
+  <article class="lesson" id="lesson-5" hidden>
+    <header class="lesson-head">
+      <span class="eyebrow">第 5 课 · 视角 · 极大后验 · 约 20 分钟</span>
+      <h1>极大后验视角：找后验的最高点</h1>
+      <p class="lede">上一课最后提到，除了报后验的均值，还可以报后验曲线的最高点，也就是「最可能的位置」。这叫<strong>极大后验估计</strong>，英文缩写 MAP。沿着这条路走，估计变成了一个求最值的优化问题；取一次对数，它就是加权最小二乘。这个视角还天然告诉我们，遇到离谱的读数该怎么办。</p>
+    </header>
+
+    <h2>从后验的最高点到最小二乘</h2>
+    <ol class="steps" id="l5map"></ol>
+    <div class="eq"><div class="body m" id="l5J"></div><span class="tag">加权最小二乘</span></div>
+    <p>J 的两项可以这样读：给每个候选位置打一个「矛盾分」，离预测越远扣分越多，离读数越远也扣分越多。扣分用各自的方差做分母，所以越不准的线索，偏离它的代价越小。极大后验估计就是矛盾分最低的位置。</p>
+    <p>顺带一提，这个最小化问题本身并不依赖高斯：即使不谈概率分布，也可以直接把 J 当作出发点，这时它叫加权最小二乘，答案完全相同。高斯假设的作用，是告诉我们它同时也是后验的最高点。</p>
+
+    <h2>两根弹簧</h2>
+    <p>这个最小化问题有一个很直观的物理模型：小车被两根弹簧拉着，一根拴在<span class="pr">预测</span>位置，一根拴在<span class="ob">读数</span>位置，劲度分别是 1/P⁻ 和 1/R。弹簧的弹性势能和拉伸量的平方成正比，所以 J 就是两根弹簧的总势能，小车停下来的平衡点就是 J 的最小点。</p>
+
+    <section class="fig wide" aria-label="交互：弹簧模型">
+      <div class="fig-title"><b>两根弹簧拉着小车</b><span>弹簧越粗，劲度越大，也就是那条线索越准</span></div>
+      <canvas id="l5spring" style="height:150px" aria-label="两根弹簧和平衡点"></canvas>
+      <div class="fig-title"><b>后验 p(x | z)</b><span>正比于 exp(−J/2)</span></div>
+      <canvas id="l5post" style="height:110px" aria-label="后验密度"></canvas>
+      <div class="fig-title"><b>取负对数：J(x)</b><span>后验的最高点，正对着 J 的最低点</span></div>
+      <canvas id="l5J2" style="height:200px" aria-label="代价函数曲线"></canvas>
+      <div class="legend">
+        <span class="lg"><span class="sw dash" style="border-color:var(--pred)"></span>偏离预测的代价</span>
+        <span class="lg"><span class="sw dash" style="border-color:var(--obs)"></span>偏离读数的代价</span>
+        <span class="lg"><span class="sw" style="border-color:var(--ink)"></span>总代价 J(x)</span>
+        <span class="lg"><span class="dotm" style="background:var(--est)"></span>最小点 = 估计</span>
+      </div>
+      <div class="ctrls">
+        <div class="field pr"><div class="frow"><label for="l5m1">预测位置 x̂⁻</label><span class="val" id="l5m1v"></span></div><input type="range" id="l5m1" min="0" max="24" step="0.1" value="10"></div>
+        <div class="field pr"><div class="frow"><label for="l5s1">预测的标准差 √P⁻</label><span class="val" id="l5s1v"></span></div><input type="range" id="l5s1" min="0.3" max="4" step="0.05" value="2"></div>
+        <div class="field ob"><div class="frow"><label for="l5z">读数 z</label><span class="val" id="l5zv"></span></div><input type="range" id="l5z" min="0" max="24" step="0.1" value="12"></div>
+        <div class="field ob"><div class="frow"><label for="l5s2">读数的标准差 √R</label><span class="val" id="l5s2v"></span></div><input type="range" id="l5s2" min="0.3" max="4" step="0.05" value="1"></div>
+      </div>
+      <div class="bar">
+        <span class="seg" role="group" aria-label="读数那根弹簧的类型"><button type="button" id="l5sq" aria-pressed="true">普通弹簧（平方损失）</button><button type="button" id="l5hub" aria-pressed="false">Huber 弹簧</button></span>
+        <span class="bar" id="l5presets"></span>
+      </div>
+      <div class="readout">
+        <div class="ro" style="border-color:var(--est)"><span>平衡点 x̂</span><b id="l5r1"></b></div>
+        <div class="ro" style="border-color:var(--ink)"><span>总劲度 1/P⁻ + 1/R</span><b id="l5r2"></b></div>
+        <div class="ro" style="border-color:var(--est)"><span>融合后的方差 P</span><b id="l5r3"></b></div>
+        <div class="ro" style="border-color:var(--ink-3)"><span>被读数拽离预测的距离</span><b id="l5r4"></b></div>
+      </div>
+    </section>
+
+    <h2>看出了什么</h2>
+    <ul>
+      <li>后验的最高点、J 的最低点、弹簧的平衡点，三者是同一个位置。求最大的后验和求最小的 J 是一回事。</li>
+      <li>这个位置就是第 2 课的 x̂。劲度大的弹簧，也就是更准的那条线索，把小车拉得更近。</li>
+      <li>两根弹簧一起拉，总劲度是两者相加：1/P⁻ + 1/R。总劲度越大，小车越难被推离平衡点，这就是「精度相加」。融合后的方差 P 就是总劲度的倒数。</li>
+      <li>点「读数离谱」，再在两种弹簧之间切换。普通弹簧拉得越长、力越大，一个差了 8 米的读数能把小车拽走 4 米。Huber 弹簧拉过一定长度后，力就不再增加，小车只被拽走 1.3 米左右。<strong>把平方损失换成对野值不敏感的损失，就是基于 M 估计的鲁棒滤波的出发点。</strong>Huber 损失就是 M 估计里最常用的一种。</li>
+      <li>从极大后验的角度看，换弹簧就是换噪声模型：损失函数是噪声密度的负对数。平方损失对应高斯噪声；Huber 损失对应一种中间像高斯、两边尾巴更重的噪声。认为噪声的尾巴越重，损失增长得就越慢，估计对野值也就越不敏感。切换到 Huber 弹簧时，上面的后验曲线也跟着变了。</li>
+    </ul>
+
+    <h2>推导：最小点在哪</h2>
+    <ol class="steps" id="l5steps"></ol>
+    <div class="kcard" data-route="3"></div>
+
+    <h2>自己跑一遍</h2>
+    <p>三件事：数值求最小点并与公式对比；用一个野值对比平方损失和 Huber 损失；验证车不动时，逐步递推的卡尔曼滤波和一次性的加权最小二乘结果完全相同。</p>
+    <div class="code" data-code>
+      <div class="code-head"><button class="tab" type="button" data-lang="py" aria-selected="true">Python</button><button class="tab" type="button" data-lang="m" aria-selected="false">MATLAB</button><span class="hint">只需要 numpy</span><button class="btn copy" type="button">复制</button></div>
+<pre data-lang="py"><code class="language-python">import numpy as np
+
+x_pred, P_pred = 10.0, 2.0**2     # 预测
+z, R = 12.0, 1.0**2               # 读数
+
+# 1. 加权最小二乘：数值求最小点，和公式对比
+x = np.linspace(0, 30, 300001)
+J = (x - x_pred)**2 / P_pred + (z - x)**2 / R
+K = P_pred / (P_pred + R)
+print(f'数值最小点 {x[J.argmin()]:.3f}，公式给出 {x_pred + K * (z - x_pred):.3f}')
+
+# 2. 读数是个离谱的野值：平方损失 vs Huber 损失（只换掉读数那根弹簧）
+def huber(r, c=1.345):
+    return np.where(np.abs(r) &lt;= c, r**2 / 2, c * np.abs(r) - c**2 / 2)
+P_pred2, z_bad = 1.0**2, 18.0      # 这次预测更有把握一些，读数却差了 8 m
+J_sq = (x - x_pred)**2 / P_pred2 + (z_bad - x)**2 / R
+J_hub = (x - x_pred)**2 / P_pred2 + 2 * huber((z_bad - x) / np.sqrt(R))
+print(f'野值 z = {z_bad}：平方损失给出 {x[J_sq.argmin()]:.2f}，Huber 损失给出 {x[J_hub.argmin()]:.2f}')
+
+# 3. 车不动、Q = 0 时：逐步递推的卡尔曼滤波 = 一次性的加权最小二乘
+rng = np.random.default_rng()
+x_true, x0, P0 = 5.0, 0.0, 10.0**2
+zs = x_true + rng.normal(0, np.sqrt(R), 20)
+xh, P = x0, P0
+for zk in zs:                     # F = 1、Q = 0、u = 0 的卡尔曼滤波
+    K = P / (P + R)
+    xh += K * (zk - xh)
+    P *= 1 - K
+batch = (x0 / P0 + zs.sum() / R) / (1 / P0 + len(zs) / R)   # 精度加权平均
+print(f'逐步递推 {xh:.4f}，一次性求解 {batch:.4f}；方差 {P:.4f} vs {1 / (1 / P0 + len(zs) / R):.4f}')</code></pre>
+<pre data-lang="m" hidden><code class="language-matlab">x_pred = 10; P_pred = 2^2;        % 预测
+z = 12; R = 1^2;                  % 读数
+
+% 1. 加权最小二乘：数值求最小点，和公式对比
+x = linspace(0, 30, 300001);
+J = (x - x_pred).^2 / P_pred + (z - x).^2 / R;
+[~, i] = min(J);
+K = P_pred / (P_pred + R);
+fprintf('数值最小点 %.3f，公式给出 %.3f\n', x(i), x_pred + K * (z - x_pred));
+
+% 2. 读数是个离谱的野值：平方损失 vs Huber 损失（只换掉读数那根弹簧）
+huber = @(r, c) (abs(r) &lt;= c) .* r.^2 / 2 + (abs(r) &gt; c) .* (c * abs(r) - c^2 / 2);
+P_pred2 = 1^2; z_bad = 18;        % 这次预测更有把握一些，读数却差了 8 m
+J_sq = (x - x_pred).^2 / P_pred2 + (z_bad - x).^2 / R;
+J_hub = (x - x_pred).^2 / P_pred2 + 2 * huber((z_bad - x) / sqrt(R), 1.345);
+[~, i1] = min(J_sq); [~, i2] = min(J_hub);
+fprintf('野值 z = %g：平方损失给出 %.2f，Huber 损失给出 %.2f\n', z_bad, x(i1), x(i2));
+
+% 3. 车不动、Q = 0 时：逐步递推的卡尔曼滤波 = 一次性的加权最小二乘
+x_true = 5; x0 = 0; P0 = 10^2;
+zs = x_true + sqrt(R) * randn(20, 1);
+xh = x0; P = P0;
+for k = 1:numel(zs)               % F = 1、Q = 0、u = 0 的卡尔曼滤波
+    K = P / (P + R);
+    xh = xh + K * (zs(k) - xh);
+    P = (1 - K) * P;
+end
+batch = (x0 / P0 + sum(zs) / R) / (1 / P0 + numel(zs) / R);   % 精度加权平均
+fprintf('逐步递推 %.4f，一次性求解 %.4f\n', xh, batch);</code></pre>
+    </div>
+
+    <nav class="pager" aria-label="翻页">
+      <a href="#lesson-4"><small>上一课</small>← 第 4 课 · 贝叶斯视角</a>
+      <span class="next"><small>下一课</small>第 6 课 · 几何视角（即将上线）</span>
+    </nav>
+  </article>
+
+
+
+
+
+
+  </main>
+</div>
+
+<script>
+// ===================== math markup helpers =====================
+const I = s => `<i>${s}</i>`;
+const hat = s => `<span class="hat">${s}</span>`;
+const til = s => `<span class="til">${s}</span>`;   // r : the innovation
+const blank = v => v === '' || v == null;
+const ss = (sup, sub) => `<span class="ss"><span>${blank(sup) ? '&nbsp;' : sup}</span><span>${blank(sub) ? '&nbsp;' : sub}</span></span>`;
+const fr = (n, d) => `<span class="fr"><span>${n}</span><span>${d}</span></span>`;
+const C = (c, s) => `<span class="${c}">${s}</span>`;
+const KK = I('k'), KM1 = `${I('k')}−1`;
+const xP = (k = KK) => C('pr', I(hat('x')) + ss('−', k));
+const PP = (k = KK) => C('pr', I('P') + ss('−', k));
+const xE = (k = KK) => C('es', I(hat('x')) + ss('', k));
+const PE = (k = KK) => C('es', I('P') + ss('', k));
+const zz = (k = KK) => C('ob', I('z') + `<sub>${k}</sub>`);
+const RR = C('ob', I('R'));
+const QQ = I('Q');
+const Kg = (k = KK) => I('K') + `<sub>${k}</sub>`;
+const xT = (k = KK) => I('x') + `<sub>${k}</sub>`;
+const UDT = `${I('u')}Δ${I('t')}`;
+const mu = (i, c) => C(c, I('μ') + (i ? `<sub>${i}</sub>` : ''));
+const s2 = (i, c) => C(c, I('σ') + (i ? ss('2', i) : '<sup>2</sup>'));
+const sig = (i, c) => C(c, I('σ') + (i ? `<sub>${i}</sub>` : ''));
+const NUM = v => `<span class="num">${v}</span>`;
+const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2), f3 = v => v.toFixed(3);
+const fK = k => Math.abs(k * 100 - Math.round(k * 100)) < 1e-9 ? k.toFixed(2) : k.toFixed(3);   // gains: show the extra digit when off the slider grid
+const fv = v => v < 0.1 ? v.toFixed(3) : v.toFixed(2);
+const exp = s => `exp(${s})`;
+
+// ===================== shared drawing =====================
+const $ = id => document.getElementById(id);
+function T() {
+  const cs = getComputedStyle(document.documentElement), o = {};
+  for (const k of ['sheet', 'paper', 'ink', 'ink-2', 'ink-3', 'rule', 'grid', 'pred', 'pred-soft', 'obs', 'obs-soft', 'est', 'est-soft', 'f-mono', 'f-body'])
+    o[k] = cs.getPropertyValue('--' + k).trim();
+  return o;
+}
+function prep(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return {};
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  return { ctx, W, H };
+}
+const gpdf = (x, m, v) => Math.exp(-((x - m) ** 2) / (2 * v)) / Math.sqrt(2 * Math.PI * v);
+function niceMax(v) { const e = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * e >= v) return m * e; return 10 * e; }
+function tickStep(pxPerUnit, minPx) { for (const s of [0.5, 1, 2, 5, 10, 20, 50]) if (s * pxPerUnit >= minPx) return s; return 100; }
+
+// Gaussian panel used by lessons 2 and 3
+function gaussPanel(cv, o) {
+  const { ctx, W, H } = prep(cv); if (!ctx) return;
+  const c = T();
+  const padL = 12, padR = 12, axisY = H - (o.lever ? 56 : 30), top = 14;
+  const X = x => padL + (x - o.lo) / (o.hi - o.lo) * (W - padL - padR);
+  let peak = 0; for (const g of o.curves) peak = Math.max(peak, gpdf(g.m, g.m, g.v));
+  const Y = p => axisY - p / (peak * 1.12) * (axisY - top);
+  // grid + axis
+  const st = tickStep((W - padL - padR) / (o.hi - o.lo), 56);
+  ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.beginPath();
+  for (let v = Math.ceil(o.lo / st) * st; v <= o.hi + 1e-9; v += st) { const px = Math.round(X(v)) + .5; ctx.moveTo(px, top); ctx.lineTo(px, axisY); }
+  ctx.stroke();
+  ctx.strokeStyle = c['ink-3']; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(padL, axisY + .5); ctx.lineTo(W - padR, axisY + .5); ctx.stroke();
+  ctx.fillStyle = c['ink-3']; ctx.font = `11px ${c['f-mono']}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let v = Math.ceil(o.lo / st) * st; v <= o.hi + 1e-9; v += st) { const px = X(v); ctx.beginPath(); ctx.moveTo(px, axisY); ctx.lineTo(px, axisY + 4); ctx.stroke(); ctx.fillText(+v.toFixed(1) + '', px, axisY + 7); }
+  ctx.textAlign = 'right'; ctx.fillText('位置 (m)', W - padR, axisY + 7 + 13);
+  ctx.save(); ctx.beginPath(); ctx.rect(padL, 0, W - padL - padR, axisY); ctx.clip();
+  // truth
+  if (o.truth != null) {
+    ctx.strokeStyle = c['ink-3']; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(X(o.truth) + .5, top); ctx.lineTo(X(o.truth) + .5, axisY); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // curves
+  for (const g of o.curves) {
+    const n = 220; ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const x = o.lo + (o.hi - o.lo) * i / n; const p = [X(x), Y(gpdf(x, g.m, g.v))]; i ? ctx.lineTo(...p) : ctx.moveTo(...p); }
+    if (g.fill) { ctx.lineTo(X(o.hi), axisY); ctx.lineTo(X(o.lo), axisY); ctx.closePath(); ctx.fillStyle = c[g.fill]; ctx.fill(); ctx.beginPath(); for (let i = 0; i <= n; i++) { const x = o.lo + (o.hi - o.lo) * i / n; const p = [X(x), Y(gpdf(x, g.m, g.v))]; i ? ctx.lineTo(...p) : ctx.moveTo(...p); } }
+    ctx.strokeStyle = c[g.col]; ctx.lineWidth = g.lw || 2; ctx.globalAlpha = g.alpha ?? 1;
+    if (g.dash) ctx.setLineDash([6, 5]);
+    ctx.stroke(); ctx.setLineDash([]);
+    // mean stem
+    if (g.stem !== false) { ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(g.m) + .5, Y(gpdf(g.m, g.m, g.v))); ctx.lineTo(X(g.m) + .5, axisY); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+  // mean-only markers (a mean known before its spread is drawn)
+  for (const mk of o.marks || []) {
+    ctx.strokeStyle = c[mk.col]; ctx.lineWidth = 2; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(X(mk.m) + .5, top + 10); ctx.lineTo(X(mk.m) + .5, axisY); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // shift arrow (lesson 3, step ①)
+  if (o.arrow) {
+    const y = axisY - 14, a = X(o.arrow.from), b = X(o.arrow.to);
+    ctx.strokeStyle = c.pred; ctx.fillStyle = c.pred; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(a, y); ctx.lineTo(b - 6 * Math.sign(b - a), y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(b, y); ctx.lineTo(b - 9 * Math.sign(b - a), y - 5); ctx.lineTo(b - 9 * Math.sign(b - a), y + 5); ctx.closePath(); ctx.fill();
+    ctx.font = `600 12px ${c['f-body']}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText('+uΔt', (a + b) / 2, y - 5);
+  }
+  ctx.restore();
+  // lever: weighted average picture
+  if (o.lever && !o.lever.hide) {
+    const L = o.lever, y = H - 12, a = X(L.a), b = X(L.b), m = X(L.m);
+    ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.strokeStyle = c.rule; ctx.beginPath(); ctx.moveTo(a, y); ctx.lineTo(b, y); ctx.stroke();
+    ctx.strokeStyle = c.est; ctx.beginPath(); ctx.moveTo(a, y); ctx.lineTo(m, y); ctx.stroke();
+    const dot = (x, col, r) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+    dot(a, c.pred, 5); dot(b, c.obs, 5); dot(m, c.est, 6);
+    ctx.fillStyle = c['ink-2']; ctx.font = `12px ${c['f-body']}`; ctx.textBaseline = 'middle';
+    const txt = `K = ${L.K.toFixed(2)}：从预测往读数走了 ${Math.round(L.K * 100)}%`;
+    const right = Math.max(a, b) + 12, left = Math.min(a, b) - 12;
+    if (right + ctx.measureText(txt).width < W - 4) { ctx.textAlign = 'left'; ctx.fillText(txt, right, y); }
+    else if (left - ctx.measureText(txt).width > 4) { ctx.textAlign = 'right'; ctx.fillText(txt, left, y); }
+    else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(txt, Math.min(W - 120, Math.max(120, m)), y - 9); }
+    ctx.lineCap = 'butt';
+  }
+}
+
+// time-series strip: k on x, value on y
+function strip(cv, o) {
+  const { ctx, W, H } = prep(cv); if (!ctx) return null;
+  const c = T();
+  const ml = 34, mr = 8, mt = 8, mb = 20;
+  const X = k => ml + (W - ml - mr) * k / (o.n - 1);
+  const Y = v => mt + (H - mt - mb) * (1 - (v - o.lo) / (o.hi - o.lo));
+  ctx.font = `10.5px ${c['f-mono']}`; ctx.fillStyle = c['ink-3']; ctx.strokeStyle = c.grid; ctx.lineWidth = 1;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const v of o.ticks) { const py = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(ml, py); ctx.lineTo(W - mr, py); ctx.stroke(); ctx.fillText(o.fmt(v), ml - 6, py); }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let k = 0; k < o.n; k += (o.n > 120 ? 40 : o.n > 60 ? 20 : 10)) ctx.fillText(k === 0 ? 'k=0' : k, X(k), H - mb + 5);
+  ctx.save(); ctx.beginPath(); ctx.rect(ml, mt - 2, W - ml - mr, H - mt - mb + 4); ctx.clip();
+  return { ctx, c, X, Y, W, H, ml, mr, mt, mb, done() { ctx.restore(); } };
+}
+function cursor(f, k) { const { ctx, c } = f; ctx.strokeStyle = c['ink-3']; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(f.X(k) + .5, f.mt); ctx.lineTo(f.X(k) + .5, f.H - f.mb); ctx.stroke(); ctx.setLineDash([]); }
+function polyline(f, n0, n1, fx, col, lw) { const { ctx } = f; ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); for (let k = n0; k <= n1; k++) { const p = [f.X(k), f.Y(fx(k))]; k === n0 ? ctx.moveTo(...p) : ctx.lineTo(...p); } ctx.stroke(); }
+
+// ===================== the toy car (lessons 1 and 3) =====================
+const N = 200, U = 1, DT = 1;
+function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const memo = new Map();
+function car(seed, sw, sr, x0h = 0, P0 = 0) {
+  const key = `${seed}|${sw}|${sr}|${x0h}|${P0}`; if (memo.has(key)) return memo.get(key);
+  const r = mulberry32(seed * 7919 + 11);
+  const g = () => { let a = 0; while (a === 0) a = r(); return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * r()); };
+  const wn = [], vn = []; for (let k = 0; k < N; k++) { wn.push(g()); vn.push(g()); }
+  const Q = sw * sw, R = sr * sr;
+  const x = [0], z = [], dr = [], xp = [NaN], Pp = [NaN], K = [NaN], xe = [], P = [];
+  for (let k = 1; k < N; k++) x.push(x[k - 1] + U * DT + sw * wn[k]);
+  for (let k = 0; k < N; k++) { z.push(x[k] + sr * vn[k]); dr.push(k * U * DT); }
+  xe.push(x0h); P.push(P0);   // x̂₀ and P₀ are given; the first reading arrives at k = 1
+  for (let k = 1; k < N; k++) {
+    const a = xe[k - 1] + U * DT, b = P[k - 1] + Q, kk = b / (b + R);
+    xp.push(a); Pp.push(b); K.push(kk); xe.push(a + kk * (z[k] - a)); P.push((1 - kk) * b);
+  }
+  const Pinf = (Q + Math.sqrt(Q * Q + 4 * Q * R)) / 2;
+  const s = { x, z, dr, xp, Pp, K, xe, P, Q, R, sw, sr, x0h, P0, Kinf: Pinf / (Pinf + R), Ppinf: Pinf };
+  memo.set(key, s); if (memo.size > 80) memo.delete(memo.keys().next().value);
+  return s;
+}
+const rms = (a, x, k) => { let s = 0; for (let i = 0; i <= k; i++) s += (a[i] - x[i]) ** 2; return Math.sqrt(s / (k + 1)); };
+
+// ===================== LESSON 1 =====================
+const L1 = { seed: 7, sw: 0.5, sr: 2, k: N - 1, playing: false, kf: true, acc: 0 };
+$('eqMotion').innerHTML = `${xT()} = ${xT(KM1)} + ${UDT} + ${I('w')}<sub>${KK}</sub>,&emsp;E[${I('w')}<sub>${KK}</sub>] = 0,&ensp;Var(${I('w')}<sub>${KK}</sub>) = ${QQ}`;
+$('eqMeas').innerHTML = `${zz()} = ${xT()} + ${I('v')}<sub>${KK}</sub>,&emsp;E[${I('v')}<sub>${KK}</sub>] = 0,&ensp;Var(${I('v')}<sub>${KK}</sub>) = ${RR}`;
+$('symTable').innerHTML = [
+  [xT(), '第 k 步小车的真实位置。滤波器永远看不到它', '要估计的量'],
+  [I('u'), '名义速度', '1 m/s'],
+  [`Δ${I('t')}`, '两次读数之间的时间', '1 s'],
+  [`${I('w')}<sub>${KK}</sub>`, '运动扰动：打滑、路面不平造成的随机偏差', `标准差 σ<sub>w</sub>，方差 ${QQ}`],
+  [zz(), '第 k 步的传感器读数', '每秒一个'],
+  [`${I('v')}<sub>${KK}</sub>`, '传感器噪声', `标准差 σ<sub>R</sub>，方差 ${RR}`],
+].map(r => `<tr><td class="m">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+
+function l1Steps() {
+  const S = car(L1.seed, L1.sw, L1.sr);
+  const xd = (k = KK) => C('pr', I(hat('x')) + ss('DR', k));
+  const e = (k = KK) => I('e') + `<sub>${k}</sub>`;
+  const kstar = S.R / S.Q;
+  const items = [
+    [`只信预测时，从已知的起点出发，每一步都按名义速度往前推（上标 DR 表示航位推算）：`, `${xd()} = ${xd(KM1)} + ${UDT}`],
+    [`定义估计误差为估计值减真实值。把运动模型代进去，<span class="m">${UDT}</span> 两边抵消：`, `${e()} = ${xd()} − ${xT()} = (${xd(KM1)} − ${xT(KM1)}) − ${I('w')}<sub>${KK}</sub> = ${e(KM1)} − ${I('w')}<sub>${KK}</sub>`],
+    [`<span class="m">${I('w')}<sub>${KK}</sub></span> 是这一步新出现的扰动，而之前积累的误差只由更早的扰动决定，按假设 1（噪声是白的），两者不相关。两个不相关的随机变量相加，方差也相加：`, `Var(${e()}) = Var(${e(KM1)}) + ${QQ}`],
+    [`起点已知，<span class="m">${e(0)} = 0</span>。一步步往回代：`, `Var(${e()}) = ${I('k')}${QQ}&emsp;⇒&emsp;标准差 = √${I('k')} · ${sig('w')}`],
+    [`误差的标准差随 √k 增长，永远停不下来。只信传感器就不一样：误差就是噪声本身，方差恒定：`, `${e()} = ${zz()} − ${xT()} = ${I('v')}<sub>${KK}</sub>&emsp;⇒&emsp;Var(${e()}) = ${RR}`],
+    [`两者相等的那一步就是交叉点：`, `${I('k')}${QQ} = ${RR}&emsp;⇒&emsp;${I('k')}<sub>c</sub> = ${fr(RR, QQ)}`,
+      `用你现在的参数：k<sub>c</sub> = ${fv(S.R)} / ${fv(S.Q)} ≈ <b>${kstar >= 10 ? Math.round(kstar) : kstar.toFixed(1)}</b> 步`],
+  ];
+  $('l1steps').innerHTML = items.map(([t, m, live]) => `<li><p>${t}</p><div class="mrow m">${m}</div>${live ? `<div class="live" id="l1live">${live}</div>` : ''}</li>`).join('');
+}
+
+function drawL1() {
+  const S = car(L1.seed, L1.sw, L1.sr), k = Math.floor(L1.k);
+  // --- track view ---
+  const tv = prep($('l1track'));
+  if (tv.ctx) {
+    const { ctx, W, H } = tv, c = T();
+    let maxDr = 0; for (let i = 0; i < N; i++) maxDr = Math.max(maxDr, Math.abs(S.dr[i] - S.x[i]), L1.kf ? Math.abs(S.xe[i] - S.x[i]) : 0);
+    const half = Math.max(6, 3.3 * S.sr, maxDr + 1.5);
+    const cx = S.x[k], pxm = (W - 40) / (2 * half), X = v => W / 2 + (v - cx) * pxm;
+    const axisY = 106, readY = 146;
+    const st = tickStep(pxm, 46);
+    ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.beginPath();
+    for (let v = Math.ceil((cx - half - 2) / st) * st; X(v) <= W; v += st) { const px = Math.round(X(v)) + .5; ctx.moveTo(px, 8); ctx.lineTo(px, H - 4); }
+    ctx.stroke();
+    ctx.strokeStyle = c['ink-3']; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, axisY + .5); ctx.lineTo(W, axisY + .5); ctx.stroke();
+    ctx.fillStyle = c['ink-3']; ctx.font = `11px ${c['f-mono']}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let v = Math.ceil((cx - half - 2) / st) * st; X(v) <= W; v += st) { const px = X(v); if (px < 14 || px > W - 14) continue; ctx.fillText(+v.toFixed(1) + ' m', px, axisY + 6); }
+    // markers
+    const guide = (x, y0, col) => { ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x + .5, y0); ctx.lineTo(x + .5, axisY); ctx.stroke(); ctx.setLineDash([]); };
+    const label = (txt, x, y, col) => { ctx.fillStyle = col; ctx.font = `600 12.5px ${c['f-body']}`; ctx.textBaseline = 'middle'; const w = ctx.measureText(txt).width; if (x + 12 + w < W) { ctx.textAlign = 'left'; ctx.fillText(txt, x + 12, y); } else { ctx.textAlign = 'right'; ctx.fillText(txt, x - 12, y); } };
+    // readings row (recent ones fade)
+    for (let i = Math.max(0, k - 5); i <= k; i++) { ctx.globalAlpha = i === k ? 1 : 0.18 + 0.1 * (i - k + 5); ctx.fillStyle = c.obs; ctx.beginPath(); ctx.arc(X(S.z[i]), readY, i === k ? 6 : 4, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1; guide(X(S.z[k]), readY - 7, c.obs); label('读数 z', X(S.z[k]), readY, c.obs);
+    // dead reckoning
+    const yd = 22; guide(X(S.dr[k]), yd + 7, c.pred);
+    ctx.fillStyle = c.pred; ctx.beginPath(); const xd = X(S.dr[k]); ctx.moveTo(xd, yd - 7); ctx.lineTo(xd + 7, yd); ctx.lineTo(xd, yd + 7); ctx.lineTo(xd - 7, yd); ctx.closePath(); ctx.fill();
+    label('只信预测', xd, yd, c.pred);
+    if (L1.kf) { const yk = 52, xk = X(S.xe[k]); guide(xk, yk + 6, c.est); ctx.fillStyle = c.est; ctx.beginPath(); ctx.arc(xk, yk, 6, 0, Math.PI * 2); ctx.fill(); label('卡尔曼滤波', xk, yk, c.est); }
+    // the car (truth)
+    const x0 = X(S.x[k]), bw = 38, bh = 13, by = axisY - 6 - bh;
+    ctx.fillStyle = c.ink;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0 - bw / 2, by, bw, bh, 4) : ctx.rect(x0 - bw / 2, by, bw, bh); ctx.fill();
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0 - bw * 0.3, by - 9, bw * 0.5, 11, 4) : ctx.rect(x0 - bw * 0.3, by - 9, bw * 0.5, 11); ctx.fill();
+    ctx.fillStyle = c.sheet;
+    for (const dx of [-bw * 0.28, bw * 0.28]) { ctx.beginPath(); ctx.arc(x0 + dx, axisY - 5, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = c.ink; ctx.beginPath(); ctx.arc(x0 + dx, axisY - 5, 3.6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = c.sheet; }
+    ctx.fillStyle = c['ink-2']; ctx.font = `12px ${c['f-body']}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText('真实位置', x0 - bw / 2 - 8, by + 4);
+  }
+  // --- error chart ---
+  let m = 3 * S.sr; for (let i = 0; i < N; i++) m = Math.max(m, Math.abs(S.dr[i] - S.x[i]), Math.sqrt(i * S.Q) * 1.2);
+  const ym = niceMax(m * 1.06);
+  const f = strip($('l1err'), { n: N, lo: -ym, hi: ym, ticks: [-ym, 0, ym], fmt: v => (v > 0 ? '+' : '') + v });
+  if (f) {
+    const { ctx, c } = f;
+    ctx.fillStyle = c['obs-soft']; ctx.fillRect(f.X(0), f.Y(S.sr), f.X(N - 1) - f.X(0), f.Y(-S.sr) - f.Y(S.sr));
+    ctx.setLineDash([5, 4]); polyline(f, 0, N - 1, i => Math.sqrt(i * S.Q), c.pred, 1.2); polyline(f, 0, N - 1, i => -Math.sqrt(i * S.Q), c.pred, 1.2); ctx.setLineDash([]);
+    ctx.fillStyle = c.obs; for (let i = 0; i <= k; i++) { ctx.beginPath(); ctx.arc(f.X(i), f.Y(S.z[i] - S.x[i]), 2.6, 0, Math.PI * 2); ctx.fill(); }
+    polyline(f, 0, k, i => S.dr[i] - S.x[i], c.pred, 2.2);
+    if (L1.kf) polyline(f, 0, k, i => S.xe[i] - S.x[i], c.est, 2.2);
+    cursor(f, k); f.done();
+  }
+  $('l1k').textContent = `k = ${k}`;
+  $('l1r1').textContent = rms(S.dr, S.x, k).toFixed(2) + ' m';
+  $('l1r2').textContent = rms(S.z, S.x, k).toFixed(2) + ' m';
+  $('l1r3').textContent = L1.kf ? rms(S.xe, S.x, k).toFixed(2) + ' m' : '?';
+  $('l1r3box').classList.toggle('off', !L1.kf);
+  $('l1lgK').hidden = !L1.kf;
+}
+function syncL1() {
+  $('l1srv').textContent = `${L1.sr.toFixed(1)} m（R = ${fv(L1.sr ** 2)}）`;
+  $('l1swv').textContent = `${L1.sw.toFixed(2)} m（Q = ${fv(L1.sw ** 2)}）`;
+  l1Steps(); drawL1();
+}
+$('l1sr').addEventListener('input', e => { L1.sr = +e.target.value; syncL1(); });
+$('l1sw').addEventListener('input', e => { L1.sw = +e.target.value; syncL1(); });
+$('l1kf').addEventListener('change', e => { L1.kf = e.target.checked; drawL1(); });
+$('l1seed').addEventListener('click', () => { L1.seed = 1 + Math.floor(Math.random() * 9999); syncL1(); });
+$('l1play').addEventListener('click', () => { if (!L1.playing && L1.k >= N - 1) L1.k = 0; L1.playing = !L1.playing; $('l1play').textContent = L1.playing ? '❚❚ 暂停' : '▶ 播放'; });
+$('l1step').addEventListener('click', () => { L1.playing = false; $('l1play').textContent = '▶ 播放'; L1.k = L1.k >= N - 1 ? 0 : Math.floor(L1.k) + 1; drawL1(); });
+
+// ===================== LESSON 2 · linear minimum variance =====================
+const xm = C('pr', I(hat('x')) + '<sup>−</sup>'), Pm = C('pr', I('P') + '<sup>−</sup>');
+const xh = C('es', I(hat('x'))), Ph = C('es', I('P')), z1 = C('ob', I('z'));
+const em = C('pr', I('e') + '<sup>−</sup>'), vv = C('ob', I('v')), ee = C('es', I('e'));
+$('l2form').innerHTML = `${xh} = (1 − ${I('K')}) ${xm} + ${I('K')} ${z1}&ensp;=&ensp;${xm} + ${I('K')}(${z1} − ${xm})`;
+
+const L2 = { sp: 2, sr: 1, K: 0.5, dist: '高斯' };
+const DISTS = ['高斯', '均匀', '双峰', '重尾'];
+const NS = 5000;
+const unitCache = new Map();
+// zero-mean, unit-variance noises with very different shapes
+function unitNoise(dist) {
+  if (unitCache.has(dist)) return unitCache.get(dist);
+  const r = mulberry32(4242 + DISTS.indexOf(dist) * 101);
+  const g = () => { let a = 0; while (a === 0) a = r(); return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * r()); };
+  const one = () => {
+    if (dist === '高斯') return g();
+    if (dist === '均匀') return (2 * r() - 1) * Math.sqrt(3);
+    if (dist === '双峰') return (r() < 0.5 ? -0.9 : 0.9) + Math.sqrt(0.19) * g();
+    return g() * (r() < 0.05 ? 10 : 1) / Math.sqrt(5.95);
+  };
+  const a = [], b = [];
+  for (let i = 0; i < NS; i++) { a.push(one()); b.push(one()); }
+  const out = { a, b }; unitCache.set(dist, out); return out;
+}
+
+$('l2steps').innerHTML = [
+  [`用 <span class="m">${I('x')}</span> 表示真实位置，把预测误差和读数噪声分别记为：`,
+    `${em} = ${xm} − ${I('x')},&emsp;${vv} = ${z1} − ${I('x')}`,
+    `<p>它们满足三条假设：</p><div class="mrow m">E[${em}] = E[${vv}] = 0,&emsp;Var(${em}) = ${Pm},&emsp;Var(${vv}) = ${RR},&emsp;Cov(${em}, ${vv}) = 0</div>`],
+  [`估计误差也写成这种形式，把加权修正代进去：`,
+    `${ee} = ${xh} − ${I('x')} = (1 − ${I('K')})(${xm} − ${I('x')}) + ${I('K')}(${z1} − ${I('x')}) = (1 − ${I('K')}) ${em} + ${I('K')} ${vv}`,
+    `<p>两边取期望，得到 E[e] = 0：不管 K 取多少，估计都是无偏的。</p>`],
+  [`再算方差。因为两项不相关，交叉项为 0：`,
+    `${I('P')}(${I('K')}) = (1 − ${I('K')})<sup>2</sup>${Pm} + ${I('K')}<sup>2</sup>${RR} + 2${I('K')}(1 − ${I('K')}) Cov(${em}, ${vv}) = (1 − ${I('K')})<sup>2</sup>${Pm} + ${I('K')}<sup>2</sup>${RR}`,
+    `<p>这就是上面图里那条抛物线。</p>`],
+  [`对 K 求导，令导数为 0：`,
+    `${fr(`d${I('P')}`, `d${I('K')}`)} = −2(1 − ${I('K')})${Pm} + 2${I('K')}${RR} = 0&emsp;⇒&emsp;${I('K')}* = ${fr(Pm, `${Pm} + ${RR}`)}`,
+    `<p>二阶导数 2(P⁻ + R) &gt; 0，所以这确实是最小值。</p><div class="live" id="l2live1"></div>`],
+  [`把 K* 代回去，得到最小方差：`,
+    `${Ph} = ${fr(`${Pm}${RR}`, `${Pm} + ${RR}`)} = (1 − ${I('K')}*) ${Pm}&emsp;⟺&emsp;${fr('1', Ph)} = ${fr('1', Pm)} + ${fr('1', RR)}`,
+    `<p>后一种写法说的是：方差的倒数（叫「精度」）直接相加，所以 P 一定比 P⁻ 和 R 都小。第 5 课会从另一个角度再遇到它。</p><div class="live" id="l2live2"></div>`],
+].map(([t, m, after]) => `<li><p>${t}</p><div class="mrow m">${m}</div>${after || ''}</li>`).join('');
+
+const DIST_NOTE = {
+  '高斯': '钟形，最常见的假设：中间多，两边对称地变少。',
+  '均匀': '在一个区间里每个值都同样可能，区间外完全不会出现。比如把读数四舍五入到整数带来的量化误差。',
+  '双峰': '大多数时候偏向两边中的某一边，很少恰好为 0。比如传感器在两个档位之间来回跳。',
+  '重尾': '绝大多数时候很小，偶尔突然非常大。比如 GPS 偶尔受到多路径反射的干扰。',
+};
+// small glyphs of each shape for the buttons (the heavy-tail glyph exaggerates its tails so they are visible)
+const GLYPH = {
+  '高斯': x => Math.exp(-x * x / 2),
+  '均匀': x => Math.abs(x) <= Math.sqrt(3) ? 1 : 0,
+  '双峰': x => Math.exp(-((x - 0.9) ** 2) / 0.38) + Math.exp(-((x + 0.9) ** 2) / 0.38),
+  '重尾': x => 1 / (1 + (x / 0.35) ** 2),
+};
+function distIcon(d) {
+  const f = GLYPH[d], pts = []; let mx = 0;
+  for (let i = 0; i <= 60; i++) { const x = -3 + 6 * i / 60, y = f(x); pts.push([x, y]); mx = Math.max(mx, y); }
+  const path = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${(1 + (x + 3) / 6 * 26).toFixed(1)},${(13 - y / mx * 11).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 28 14" aria-hidden="true"><path d="${path}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+}
+DISTS.forEach(d => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip'; b.dataset.d = d; b.innerHTML = distIcon(d) + d;
+  b.addEventListener('click', () => { L2.dist = d; drawL2dist(); });
+  $('l2dists').appendChild(b);
+});
+
+function l2emp(dist, k) {
+  const u = unitNoise(dist); let s = 0;
+  for (let i = 0; i < NS; i++) { const e = (1 - k) * L2.sp * u.a[i] + k * L2.sr * u.b[i]; s += e * e; }
+  return s / NS;
+}
+// variance-vs-K chart; opt.current marks the slider's K, opt.comps draws the two contributions
+function drawPar(cv, dist, opt) {
+  const pv = prep(cv); if (!pv.ctx) return;
+  const P = L2.sp ** 2, R = L2.sr ** 2, Ks = P / (P + R), Ps = (1 - Ks) * P, K = L2.K;
+  const PK = k => (1 - k) ** 2 * P + k * k * R;
+  const empG = []; for (let i = 0; i <= 20; i++) empG.push(l2emp(dist, i / 20));
+  const { ctx, W, H } = pv, c = T();
+  const ml = 46, mr = 16, mt = 14, mb = 30;
+  const ymax = niceMax(Math.max(P, R, ...empG) * 1.06);
+  const X = k => ml + (W - ml - mr) * k, Y = v => mt + (H - mt - mb) * (1 - v / ymax);
+  ctx.font = `10.5px ${c['f-mono']}`; ctx.fillStyle = c['ink-3']; ctx.strokeStyle = c.grid; ctx.lineWidth = 1;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const v of [0, ymax / 2, ymax]) { const py = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(ml, py); ctx.lineTo(W - mr, py); ctx.stroke(); ctx.fillText(+v.toFixed(2) + '', ml - 6, py); }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (const k of [0, 0.25, 0.5, 0.75, 1]) ctx.fillText(k + '', X(k), H - mb + 6);
+  ctx.textAlign = 'right'; ctx.fillText('K', W - mr, H - mb + 6 + 12);
+  ctx.save(); ctx.translate(12, mt + (H - mt - mb) / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('方差 (m²)', 0, 0); ctx.restore();
+  const curve = (f, col, lw, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.setLineDash(dash ? [6, 5] : []);
+    ctx.beginPath(); for (let i = 0; i <= 120; i++) { const k = i / 120; i ? ctx.lineTo(X(k), Y(f(k))) : ctx.moveTo(X(k), Y(f(k))); } ctx.stroke(); ctx.setLineDash([]);
+  };
+  if (opt.comps) { curve(k => (1 - k) ** 2 * P, c.pred, 1.5, true); curve(k => k * k * R, c.obs, 1.5, true); }
+  curve(PK, c.ink, 2.5);
+  ctx.strokeStyle = c['ink-2']; ctx.lineWidth = 1.4;
+  empG.forEach((v, i) => { ctx.beginPath(); ctx.arc(X(i / 20), Y(v), 3.6, 0, Math.PI * 2); ctx.stroke(); });
+  ctx.font = `600 12px ${c['f-body']}`; ctx.textBaseline = 'bottom';
+  ctx.fillStyle = c.pred; ctx.textAlign = 'left'; ctx.fillText(`P⁻ = ${f2(P)}`, X(0) + 8, Y(P) - 4);
+  ctx.fillStyle = c.obs; ctx.textAlign = 'right'; ctx.fillText(`R = ${f2(R)}`, X(1) - 8, Y(R) - 4);
+  ctx.strokeStyle = c.est; ctx.lineWidth = 1.2; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(X(Ks) + .5, Y(Ps)); ctx.lineTo(X(Ks) + .5, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = c.est; ctx.textAlign = Ks > 0.8 ? 'right' : 'left';
+  ctx.fillText(`K* = ${f2(Ks)}`, X(Ks) + (Ks > 0.8 ? -6 : 6), Y(0) - 4);
+  if (opt.current) {
+    const px = X(K), py = Y(PK(K));
+    ctx.globalAlpha = .35; ctx.strokeStyle = c.est; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px + .5, mt); ctx.lineTo(px + .5, Y(0)); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = c.est; ctx.beginPath(); ctx.arc(px, py, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = c.sheet; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = c.ink; ctx.font = `12px ${c['f-mono']}`; ctx.textBaseline = 'bottom';
+    ctx.textAlign = K > 0.7 ? 'right' : 'left'; ctx.fillText(`P(${f2(K)}) = ${f2(PK(K))}`, px + (K > 0.7 ? -12 : 12), py - 8);
+  } else {
+    ctx.fillStyle = c.est; ctx.beginPath(); ctx.arc(X(Ks), Y(Ps), 5, 0, Math.PI * 2); ctx.fill();
+  }
+}
+// histogram of the estimation error at gain K, against the K = 0 error
+function drawHist(cv, dist, K) {
+  const hv = prep(cv); if (!hv.ctx) return 0;
+  const u = unitNoise(dist), { ctx, W, H } = hv, c = T();
+  const ml = 14, mr = 14, mt = 8, mb = 22;
+  const Lr = 4 * Math.max(L2.sp, L2.sr), nb = 61, bw = 2 * Lr / nb;
+  const cur = new Array(nb).fill(0), base = new Array(nb).fill(0); let out = 0;
+  for (let i = 0; i < NS; i++) {
+    const e = (1 - K) * L2.sp * u.a[i] + K * L2.sr * u.b[i];
+    const j = Math.floor((e + Lr) / bw); if (j >= 0 && j < nb) cur[j]++; else out++;
+    const j0 = Math.floor((L2.sp * u.a[i] + Lr) / bw); if (j0 >= 0 && j0 < nb) base[j0]++;
+  }
+  const ymax = Math.max(...cur, ...base) * 1.08;
+  const X = v => ml + (W - ml - mr) * (v + Lr) / (2 * Lr), Y = n => mt + (H - mt - mb) * (1 - n / ymax);
+  ctx.fillStyle = c['est-soft'];
+  for (let j = 0; j < nb; j++) { if (!cur[j]) continue; const x0 = X(-Lr + j * bw), x1 = X(-Lr + (j + 1) * bw); ctx.fillRect(x0, Y(cur[j]), x1 - x0, Y(0) - Y(cur[j])); }
+  ctx.strokeStyle = c.pred; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let j = 0; j < nb; j++) { const x0 = X(-Lr + j * bw), x1 = X(-Lr + (j + 1) * bw); j ? ctx.lineTo(x0, Y(base[j])) : ctx.moveTo(x0, Y(base[j])); ctx.lineTo(x1, Y(base[j])); }
+  ctx.stroke();
+  ctx.strokeStyle = c['ink-3']; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ml, Y(0) + .5); ctx.lineTo(W - mr, Y(0) + .5); ctx.stroke();
+  ctx.fillStyle = c['ink-3']; ctx.font = `10.5px ${c['f-mono']}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const st = tickStep((W - ml - mr) / (2 * Lr), 52);
+  for (let v = Math.ceil(-Lr / st) * st; v <= Lr + 1e-9; v += st) ctx.fillText(+v.toFixed(1) + (v === 0 ? ' m' : ''), X(v), Y(0) + 5);
+  return out;
+}
+function drawL2() {
+  const P = L2.sp ** 2, R = L2.sr ** 2, K = L2.K, Ks = P / (P + R), Ps = (1 - Ks) * P;
+  const PK = k => (1 - k) ** 2 * P + k * k * R;
+  drawPar($('l2par'), '高斯', { current: true, comps: true });
+  $('l2Kv').textContent = fK(K);
+  $('l2spv').textContent = `${f2(L2.sp)} m（P⁻ = ${f2(P)}）`;
+  $('l2srv').textContent = `${f2(L2.sr)} m（R = ${f2(R)}）`;
+  $('l2r1').textContent = `${f2(PK(K))} m²`;
+  $('l2r2').textContent = `${f2(l2emp('高斯', K))} m²`;
+  $('l2r3').textContent = f3(Ks);
+  $('l2r4').textContent = `${f2(Ps)} m²`;
+  $('l2live1').innerHTML = `用你现在的参数：K* = ${f2(P)} / (${f2(P)} + ${f2(R)}) = <b>${f3(Ks)}</b>`;
+  $('l2live2').innerHTML = `用你现在的参数：P = (1 − ${f3(Ks)}) × ${f2(P)} = <b>${f3(Ps)}</b>，比 P⁻ = ${f2(P)} 和 R = ${f2(R)} 都小`;
+  drawL2dist();
+}
+function drawL2dist() {
+  const P = L2.sp ** 2, R = L2.sr ** 2, Ks = P / (P + R), Ps = (1 - Ks) * P;
+  document.querySelectorAll('#l2dists .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === L2.dist));
+  $('l2distnote').textContent = `${L2.dist}：${DIST_NOTE[L2.dist]}`;
+  drawPar($('l2par2'), L2.dist, { current: false, comps: false });
+  const out = drawHist($('l2hist'), L2.dist, Ks);
+  $('l2histnote').textContent = `实测方差 ${f2(l2emp(L2.dist, Ks))} m²，理论值 ${f2(Ps)} m²` + (out ? ` · 另有 ${out} 次超出画面` : '');
+}
+$('l2K').addEventListener('input', e => { L2.K = +e.target.value; drawL2(); });
+$('l2sp').addEventListener('input', e => { L2.sp = +e.target.value; drawL2(); });
+$('l2sr').addEventListener('input', e => { L2.sr = +e.target.value; drawL2(); });
+$('l2best').addEventListener('click', () => { const P = L2.sp ** 2, R = L2.sr ** 2; L2.K = P / (P + R); $('l2K').value = L2.K; drawL2(); });
+
+// ===================== LESSON 4 · Bayesian view =====================
+const st4 = items => items.map(([t, m, after]) => `<li><p>${t}</p>${m ? `<div class="mrow m">${m}</div>` : ''}${after || ''}</li>`).join('');
+$('l4bayes').innerHTML = `${C('es', `${I('p')}(${I('x')} | ${I('z')})`)} = ${fr(`${C('ob', `${I('p')}(${I('z')} | ${I('x')})`)} · ${C('pr', `${I('p')}(${I('x')})`)}`, `${I('p')}(${I('z')})`)}&emsp;∝&emsp;${C('ob', `${I('p')}(${I('z')} | ${I('x')})`)} · ${C('pr', `${I('p')}(${I('x')})`)}`;
+
+// ---- interactive A: Gaussian prior × Gaussian likelihood ----
+const L4 = { m1: 10, s1: 2, m2: 12, s2: 1 };
+const L4P = [
+  ['两者一样准', { m1: 9, s1: 1.5, m2: 12, s2: 1.5 }],
+  ['读数很准', { m1: 9, s1: 2.5, m2: 12, s2: 0.4 }],
+  ['读数很差', { m1: 9, s1: 1, m2: 12, s2: 4 }],
+  ['恢复默认', { m1: 10, s1: 2, m2: 12, s2: 1 }],
+];
+L4P.forEach(([name, p]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = name; b.addEventListener('click', () => { Object.assign(L4, p); syncL4(); }); $('l4presets').appendChild(b); });
+function syncL4() {
+  for (const k of ['m1', 's1', 'm2', 's2']) $('l4' + k).value = L4[k];
+  $('l4m1v').textContent = f1(L4.m1) + ' m'; $('l4s1v').textContent = f2(L4.s1) + ' m';
+  $('l4m2v').textContent = f1(L4.m2) + ' m'; $('l4s2v').textContent = f2(L4.s2) + ' m';
+  const a = L4.s1 ** 2, b = L4.s2 ** 2, K = a / (a + b), m = L4.m1 + K * (L4.m2 - L4.m1), v = (1 - K) * a;
+  $('l4eqK').innerHTML = `${I('K')} = ${fr(s2(1, 'pr'), `${s2(1, 'pr')} + ${s2(2, 'ob')}`)} = ${fr(NUM(f2(a)), `${NUM(f2(a))} + ${NUM(f2(b))}`)} = <b>${NUM(f2(K))}</b>`;
+  $('l4eqMu').innerHTML = `${mu(0, 'es')} = ${mu(1, 'pr')} + ${I('K')}(${mu(2, 'ob')} − ${mu(1, 'pr')}) = ${NUM(f1(L4.m1))} + ${NUM(f2(K))} × (${NUM(f1(L4.m2))} − ${NUM(f1(L4.m1))}) = <b class="es">${NUM(f2(m))}</b>`;
+  $('l4eqVar').innerHTML = `${s2(0, 'es')} = (1 − ${I('K')}) ${s2(1, 'pr')} = ${NUM(f2(1 - K))} × ${NUM(f2(a))} = ${NUM(f2(v))}&emsp;⇒&emsp;${sig(0, 'es')} = <b class="es">${NUM(f2(Math.sqrt(v)))}</b>`;
+  $('l4note').textContent = `后验的 σ = ${f2(Math.sqrt(v))} m，比先验的 ${f2(L4.s1)} m 和读数的 ${f2(L4.s2)} m 都小。`;
+  gaussPanel($('l4c'), {
+    lo: 0, hi: 20,
+    curves: [
+      { m: L4.m1, v: a, col: 'pred', fill: 'pred-soft' },
+      { m: L4.m2, v: b, col: 'obs', fill: 'obs-soft' },
+      { m, v, col: 'est', fill: 'est-soft', lw: 3 },
+    ],
+    lever: { a: L4.m1, b: L4.m2, m, K },
+  });
+  drawL4B(); drawL4M();
+}
+for (const k of ['m1', 's1', 'm2', 's2']) $('l4' + k).addEventListener('input', e => { L4[k] = +e.target.value; syncL4(); });
+
+$('l4steps').innerHTML = st4([
+  [`先验是高斯 <span class="m">${I('N')}(${mu(1, 'pr')}, ${s2(1, 'pr')})</span>，似然看成 x 的函数也是高斯形状，中心 <span class="m">${mu(2, 'ob')}</span>、方差 <span class="m">${s2(2, 'ob')}</span>。把两者相乘，常数系数先不管，最后归一化时会处理：`,
+    `${I('p')}(${I('x')} | ${I('z')}) ∝ ${exp(`−${fr(`(${I('x')} − ${mu(1, 'pr')})<sup>2</sup>`, `2${s2(1, 'pr')}`)}`)} · ${exp(`−${fr(`(${I('x')} − ${mu(2, 'ob')})<sup>2</sup>`, `2${s2(2, 'ob')}`)}`)}`],
+  [`两个指数相乘，指数相加：`,
+    `${I('p')}(${I('x')} | ${I('z')}) ∝ ${exp(`−½ [ ${fr(`(${I('x')} − ${mu(1, 'pr')})<sup>2</sup>`, s2(1, 'pr'))} + ${fr(`(${I('x')} − ${mu(2, 'ob')})<sup>2</sup>`, s2(2, 'ob'))} ]`)}`],
+  [`方括号里是 <span class="m">${I('x')}</span> 的二次函数。展开，按 <span class="m">${I('x')}</span> 的次数整理，和 <span class="m">${I('x')}</span> 无关的项都并进「常数」：`,
+    `[ · ] = (${fr('1', s2(1, 'pr'))} + ${fr('1', s2(2, 'ob'))}) ${I('x')}<sup>2</sup> − 2 (${fr(mu(1, 'pr'), s2(1, 'pr'))} + ${fr(mu(2, 'ob'), s2(2, 'ob'))}) ${I('x')} + 常数`],
+  [`关键的一步：指数是 x 的二次函数、且开口向下的密度，一定是高斯。一个高斯 <span class="m">${I('N')}(${mu(0, 'es')}, ${s2(0, 'es')})</span> 的指数部分展开是 <span class="m">${fr(`${I('x')}<sup>2</sup>`, s2(0, 'es'))} − ${fr(`2${mu(0, 'es')}${I('x')}`, s2(0, 'es'))} + 常数</span>。对比 <span class="m">${I('x')}<sup>2</sup></span> 和 <span class="m">${I('x')}</span> 的系数：`,
+    `${fr('1', s2(0, 'es'))} = ${fr('1', s2(1, 'pr'))} + ${fr('1', s2(2, 'ob'))},&emsp;&emsp;${fr(mu(0, 'es'), s2(0, 'es'))} = ${fr(mu(1, 'pr'), s2(1, 'pr'))} + ${fr(mu(2, 'ob'), s2(2, 'ob'))}`,
+    `<p>所以后验仍然是高斯。这就是图里三条曲线都是钟形的原因。</p>`],
+  [`第一个式子说：方差的倒数（叫「精度」）直接相加。后验的精度一定比两者都大，所以 <span class="m">${sig(0, 'es')}</span> 一定比两者都小。解出来：`,
+    `${s2(0, 'es')} = ${fr(`${s2(1, 'pr')}${s2(2, 'ob')}`, `${s2(1, 'pr')} + ${s2(2, 'ob')}`)},&emsp;&emsp;${mu(0, 'es')} = ${fr(`${s2(2, 'ob')}${mu(1, 'pr')} + ${s2(1, 'pr')}${mu(2, 'ob')}`, `${s2(1, 'pr')} + ${s2(2, 'ob')}`)}`],
+  [`令 <span class="m">${I('K')} = ${fr(s2(1, 'pr'), `${s2(1, 'pr')} + ${s2(2, 'ob')}`)}</span>，上面两个式子就可以改写成：`,
+    `${mu(0, 'es')} = ${mu(1, 'pr')} + ${I('K')}(${mu(2, 'ob')} − ${mu(1, 'pr')}),&emsp;&emsp;${s2(0, 'es')} = (1 − ${I('K')}) ${s2(1, 'pr')}`,
+    `<p>把 μ₁、σ₁² 换成先验的 x̂⁻、P⁻，把 μ₂、σ₂² 换成读数的 z、R，这就是第 3 课的 ③ ④ ⑤，K 和第 2 课得到的一模一样。</p>`],
+]);
+
+$('l4pred').innerHTML = st4([
+  [`小车上一步可能在很多位置。把每一个可能的出发点都考虑进来，按它的可能性加权，再看从那里出发会走到哪。这叫全概率公式：`,
+    `${C('pr', `${I('p')}(${xT()})`)} = ∫ ${I('p')}(${xT()} | ${xT(KM1)}) · ${C('es', `${I('p')}(${xT(KM1)})`)} d${xT(KM1)}`],
+  [`运动模型是 <span class="m">${xT()} = ${xT(KM1)} + ${UDT} + ${I('w')}<sub>${KK}</sub></span>。从 <span class="m">${xT(KM1)}</span> 出发走到 <span class="m">${xT()}</span>，意味着扰动恰好等于 <span class="m">${xT()} − ${xT(KM1)} − ${UDT}</span>，所以积分里的第一项就是过程噪声的密度在这一点的值。这种形式的积分叫<strong>卷积</strong>，效果是：把上一步的分布整体平移 uΔt，再用过程噪声的分布把它「抹宽」。`, ''],
+  [`高斯情形不用真的去算积分。<span class="m">${xT()}</span> 是 <span class="m">${xT(KM1)}</span> 和 <span class="m">${I('w')}<sub>${KK}</sub></span> 两个相互独立的高斯变量之和，再加一个常数。独立高斯变量的和仍然是高斯，均值相加，方差相加：`,
+    `${xT(KM1)} ~ ${I('N')}(${xE(KM1)}, ${PE(KM1)}),&ensp;${I('w')}<sub>${KK}</sub> ~ ${I('N')}(0, ${QQ})&emsp;⇒&emsp;${xT()} ~ ${I('N')}(${xE(KM1)} + ${UDT},&ensp;${PE(KM1)} + ${QQ})`,
+    `<p>均值和方差正是第 3 课的 ① 和 ②。第 3 课的图里，黄色曲线先平移、再变宽，画的就是这个卷积。</p>`],
+  [`顺便说明一点：贝叶斯这条路处理的是整个分布，需要噪声之间<strong>相互独立</strong>，比第 1 课要求的「不相关」更强。不过对联合高斯的变量来说，不相关和独立是一回事。`, ''],
+]);
+
+$('l4mmse').innerHTML = st4([
+  [`先说清楚在比什么。一个「估计方法」就是一条规则：看到读数 <span class="m">${I('z')}</span>，报出一个数 <span class="m">${I('g')}(${I('z')})</span>。规则可以是任意的函数。第 2 课只允许直线 <span class="m">${I('g')}(${I('z')}) = ${I('a')} + ${I('b')}${I('z')}</span>，现在不加任何限制。目标是让总的均方误差最小：`, `E[(${I('x')} − ${I('g')}(${I('z')}))<sup>2</sup>]`,
+    `<p>这里的平均，是对所有可能的小车位置和所有可能的读数一起取的。</p>`],
+  [`把这个总的平均拆成两层：先固定读数 z，对小车位置取平均；再对各种可能的读数取平均。这叫全期望公式：`, `E[(${I('x')} − ${I('g')}(${I('z')}))<sup>2</sup>] = E<sub>${I('z')}</sub>[ E[(${I('x')} − ${I('g')}(${I('z')}))<sup>2</sup> | ${I('z')}] ]`,
+    `<p>外层只是把内层的结果加权平均。所以只要对<strong>每一个</strong>读数 z，都让内层最小，总的平均自然就最小。问题化简成：读数 z 已经定了，后验 p(x | z) 已知，该报哪个数 a？</p>`],
+  [`读数固定后，要报的 a 只是一个数。它的均方误差是：`, `MSE(${I('a')}) = E[(${I('x')} − ${I('a')})<sup>2</sup> | ${I('z')}] = ∫ (${I('x')} − ${I('a')})<sup>2</sup> ${I('p')}(${I('x')} | ${I('z')}) d${I('x')}`,
+    `<p>意思是：小车可能在各个位置 x，每个位置的平方误差是 (x − a)²，按后验给出的可能性加权平均。这就是上面图里的 MSE(a)。</p>`],
+  [`把后验均值记作 <span class="m">${I('m')} = E[${I('x')} | ${I('z')}]</span>。在括号里加一个 m 再减一个 m，然后展开平方：`, `(${I('x')} − ${I('a')})<sup>2</sup> = [(${I('x')} − ${I('m')}) + (${I('m')} − ${I('a')})]<sup>2</sup> = (${I('x')} − ${I('m')})<sup>2</sup> + 2(${I('x')} − ${I('m')})(${I('m')} − ${I('a')}) + (${I('m')} − ${I('a')})<sup>2</sup>`],
+  [`对三项分别取条件期望。注意 m 和 a 都是确定的数，可以提到期望外面：`, '',
+    `<p>第一项：<span class="m">E[(${I('x')} − ${I('m')})<sup>2</sup> | ${I('z')}]</span>，按定义就是后验的方差。</p>
+     <p>第二项：<span class="m">2(${I('m')} − ${I('a')}) · E[${I('x')} − ${I('m')} | ${I('z')}] = 2(${I('m')} − ${I('a')}) · (${I('m')} − ${I('m')}) = 0</span>。它消失的原因只有一个：m 是均值。</p>
+     <p>第三项：<span class="m">(${I('m')} − ${I('a')})<sup>2</sup></span> 是常数，期望就是它自己。</p>`],
+  [`合起来：`, `MSE(${I('a')}) = Var(${I('x')} | ${I('z')}) + (${I('m')} − ${I('a')})<sup>2</sup>`,
+    `<p>第一项和 a 无关。第二项是一个平方，最小只能是 0，在 a = m 时取到。所以最优的选择是后验均值，最小的均方误差就是后验方差：</p>
+     <div class="mrow m">${xh} = E[${I('x')} | ${I('z')}]</div>
+     <p>整个过程没有用到后验的形状，所以对任何分布都成立。</p>`],
+  [`学过力学的话，这就是平行轴定理：把后验看成一根质量分布不均匀的杆，MSE(a) 是它绕 a 点的转动惯量。绕质心的转动惯量最小，绕别的点要再加上「总质量 × 距离的平方」。质心就是均值。`, ''],
+  [`回到卡尔曼滤波。高斯情形下，前面已经算出后验均值是 <span class="m">${mu(1, 'pr')} + ${I('K')}(${mu(2, 'ob')} − ${mu(1, 'pr')})</span>，它恰好是读数的<strong>线性</strong>函数，和第 2 课的线性最小方差估计是同一个式子。`, '',
+    `<p>两件事合在一起：第 2 课证明了它是「所有直线里最好的」，这里证明了后验均值是「所有规则里最好的」。噪声是高斯时，两者是同一个东西。所以高斯时，再聪明的非线性办法也不可能比卡尔曼滤波更好。</p>`],
+]);
+
+// ---- interactive M: which number minimises the mean-squared error ----
+const L4M = { a: 7, shape: '偏斜' };
+const MSHAPES = {
+  '高斯': x => gpdf(x, 10, 2.25),
+  '偏斜': x => 0.65 * gpdf(x, 8, 0.8) + 0.35 * gpdf(x, 11.5, 5),
+  '双峰': x => 0.5 * gpdf(x, 7, 1) + 0.5 * gpdf(x, 13, 1),
+};
+const mstat = {};
+for (const k in MSHAPES) {
+  let s0 = 0, s1 = 0, s2 = 0, pk = 0, px = 0;
+  for (let i = 0; i <= 4000; i++) { const x = -5 + 30 * i / 4000, p = MSHAPES[k](x); s0 += p; s1 += p * x; s2 += p * x * x; if (p > pk) { pk = p; px = x; } }
+  const m = s1 / s0; mstat[k] = { m, v: s2 / s0 - m * m, peak: px, pk };
+}
+Object.keys(MSHAPES).forEach(k => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = k; b.dataset.k = k; b.addEventListener('click', () => { L4M.shape = k; drawL4M(); }); $('l4mshapes').appendChild(b); });
+$('l4ma').addEventListener('input', e => { L4M.a = +e.target.value; drawL4M(); });
+$('l4mmean').addEventListener('click', () => { L4M.a = mstat[L4M.shape].m; $('l4ma').value = L4M.a; drawL4M(); });
+$('l4mpeak').addEventListener('click', () => { L4M.a = mstat[L4M.shape].peak; $('l4ma').value = L4M.a; drawL4M(); });
+function drawL4M() {
+  const st = mstat[L4M.shape], f = MSHAPES[L4M.shape], a = L4M.a, lo = 2, hi = 18;
+  const J = t => st.v + (st.m - t) ** 2;
+  document.querySelectorAll('#l4mshapes .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === L4M.shape));
+  const ml = 46, mr = 16;
+  const c1 = prep($('l4mm1'));
+  if (c1.ctx) {
+    const { ctx, W, H } = c1, c = T(), mt = 12, mb = 26;
+    const X = x => ml + (W - ml - mr) * (x - lo) / (hi - lo), Y = p => mt + (H - mt - mb) * (1 - p / (st.pk * 1.15));
+    axisX(ctx, c, X, H - mb, [2, 6, 10, 14, 18], v => v + (v === 18 ? ' m' : ''), W);
+    ctx.beginPath(); for (let i = 0; i <= 400; i++) { const x = lo + (hi - lo) * i / 400; i ? ctx.lineTo(X(x), Y(f(x))) : ctx.moveTo(X(x), Y(f(x))); }
+    ctx.strokeStyle = c.est; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.lineTo(X(hi), Y(0)); ctx.lineTo(X(lo), Y(0)); ctx.closePath(); ctx.fillStyle = c['est-soft']; ctx.fill();
+    ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(a), mt); ctx.lineTo(X(a), H - mb); ctx.stroke();
+    ctx.fillStyle = c.ink; ctx.font = `600 12px ${c['f-body']}`; ctx.textBaseline = 'top'; ctx.textAlign = a > 14 ? 'right' : 'left'; ctx.fillText(`a = ${f2(a)}`, X(a) + (a > 14 ? -7 : 7), mt);
+    const by = H - mb - 1;
+    ctx.fillStyle = c.est; ctx.beginPath(); ctx.moveTo(X(st.m), by - 12); ctx.lineTo(X(st.m) - 7, by); ctx.lineTo(X(st.m) + 7, by); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c['ink-2']; const px = X(st.peak), py = Y(st.pk) - 9; ctx.beginPath(); ctx.moveTo(px, py - 6); ctx.lineTo(px + 6, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 6, py); ctx.closePath(); ctx.fill();
+  }
+  const c2 = prep($('l4mm2'));
+  if (c2.ctx) {
+    const { ctx, W, H } = c2, c = T(), mt = 12, mb = 26;
+    const ymax = niceMax(st.v + 22);
+    const X = x => ml + (W - ml - mr) * (x - lo) / (hi - lo), Y = v => mt + (H - mt - mb) * (1 - v / ymax);
+    ctx.font = `10.5px ${c['f-mono']}`; ctx.fillStyle = c['ink-3']; ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (const v of [0, ymax / 2, ymax]) { const py = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(ml, py); ctx.lineTo(W - mr, py); ctx.stroke(); ctx.fillText(+v.toFixed(1) + '', ml - 6, py); }
+    axisX(ctx, c, X, H - mb, [2, 6, 10, 14, 18], v => v === 18 ? 'a = 18' : v + '', W);
+    ctx.save(); ctx.beginPath(); ctx.rect(ml, mt, W - ml - mr, H - mt - mb); ctx.clip();
+    ctx.strokeStyle = c.est; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.moveTo(X(lo), Y(st.v)); ctx.lineTo(X(hi), Y(st.v)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = c.ink; ctx.lineWidth = 2.5; ctx.beginPath(); for (let i = 0; i <= 200; i++) { const x = lo + (hi - lo) * i / 200; i ? ctx.lineTo(X(x), Y(J(x))) : ctx.moveTo(X(x), Y(J(x))); } ctx.stroke();
+    ctx.strokeStyle = c.obs; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(X(a), Y(st.v)); ctx.lineTo(X(a), Y(J(a))); ctx.stroke();
+    ctx.strokeStyle = c.est; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(X(a), Y(0)); ctx.lineTo(X(a), Y(st.v)); ctx.stroke();
+    ctx.fillStyle = c.ink; ctx.beginPath(); ctx.arc(X(a), Y(J(a)), 5.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = c.est; ctx.beginPath(); ctx.moveTo(X(st.m), H - mb - 13); ctx.lineTo(X(st.m) - 7, H - mb - 1); ctx.lineTo(X(st.m) + 7, H - mb - 1); ctx.closePath(); ctx.fill();
+  }
+  $('l4mav').textContent = f2(a) + ' m';
+  $('l4mr1').textContent = f2(J(a)) + ' m²';
+  $('l4mr2').textContent = f2(st.v) + ' m²';
+  $('l4mr3').textContent = f2((st.m - a) ** 2) + ' m²';
+  $('l4mr4').textContent = f2(st.m) + ' m';
+}
+
+// ---- interactive B: non-Gaussian measurement noise, exact posterior on a grid ----
+const L4B = { m1: 10, z: 12, s1: 1, s2: 1, dist: '高斯' };
+const UPDF = {
+  '高斯': r => gpdf(r, 0, 1),
+  '均匀': r => Math.abs(r) <= Math.sqrt(3) ? 1 / (2 * Math.sqrt(3)) : 0,
+  '双峰': r => 0.5 * gpdf(r, 0.9, 0.19) + 0.5 * gpdf(r, -0.9, 0.19),
+  '重尾': r => 0.95 * gpdf(r, 0, 1 / 5.95) + 0.05 * gpdf(r, 0, 100 / 5.95),
+};
+const GLO = -6, GHI = 30, GN = 721, GDX = (GHI - GLO) / (GN - 1);
+function bayesPost(z, keep) {
+  const f = UPDF[L4B.dist], P = L4B.s1 ** 2, p = keep ? new Float64Array(GN) : null;
+  let s0 = 0, s1 = 0, s2 = 0;
+  for (let i = 0; i < GN; i++) {
+    const x = GLO + i * GDX, v = gpdf(x, L4B.m1, P) * f((z - x) / L4B.s2) / L4B.s2;
+    if (p) p[i] = v; s0 += v; s1 += v * x; s2 += v * x * x;
+  }
+  if (!(s0 > 0)) return { mean: NaN, sd: NaN, p, norm: 0 };
+  const mean = s1 / s0;
+  return { mean, sd: Math.sqrt(Math.max(0, s2 / s0 - mean * mean)), p, norm: s0 * GDX };
+}
+DISTS.forEach(d => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip'; b.dataset.d = d; b.innerHTML = distIcon(d) + d;
+  b.addEventListener('click', () => { L4B.dist = d; drawL4B(); });
+  $('l4bdists').appendChild(b);
+});
+[['读数正常', 11], ['读数离谱', 18]].forEach(([name, z]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = name; b.addEventListener('click', () => { L4B.z = z; L4B.s1 = 1; L4B.s2 = 1; $('l4bz').value = z; $('l4bs1').value = 1; $('l4bs2').value = 1; drawL4B(); }); $('l4bpresets').appendChild(b); });
+$('l4bz').addEventListener('input', e => { L4B.z = +e.target.value; drawL4B(); });
+$('l4bs1').addEventListener('input', e => { L4B.s1 = +e.target.value; drawL4B(); });
+$('l4bs2').addEventListener('input', e => { L4B.s2 = +e.target.value; drawL4B(); });
+function drawL4B() {
+  const P = L4B.s1 ** 2, R = L4B.s2 ** 2, K = P / (P + R), z = L4B.z;
+  const kfM = L4B.m1 + K * (z - L4B.m1), kfV = (1 - K) * P, post = bayesPost(z, true), f = UPDF[L4B.dist];
+  document.querySelectorAll('#l4bdists .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === L4B.dist));
+  const lo = 2, hi = 22;
+  const cv = prep($('l4b'));
+  if (cv.ctx) {
+    const { ctx, W, H } = cv, c = T();
+    const ml = 14, mr = 14, mt = 10, mb = 26;
+    const X = x => ml + (W - ml - mr) * (x - lo) / (hi - lo);
+    const prior = x => gpdf(x, L4B.m1, P), lik = x => f((z - x) / L4B.s2) / L4B.s2, kf = x => gpdf(x, kfM, kfV);
+    const pst = x => { if (!post.norm) return 0; const t = (x - GLO) / GDX, i = Math.max(0, Math.min(GN - 2, Math.floor(t))), a = t - i; return (post.p[i] * (1 - a) + post.p[i + 1] * a) / post.norm; };
+    let ymax = 0; for (let i = 0; i <= 400; i++) { const x = lo + (hi - lo) * i / 400; ymax = Math.max(ymax, prior(x), lik(x), kf(x), pst(x)); }
+    ymax *= 1.1;
+    const Y = v => mt + (H - mt - mb) * (1 - v / ymax);
+    axisX(ctx, c, X, H - mb, [2, 6, 10, 14, 18, 22], v => v + (v === 22 ? ' m' : ''), W);
+    ctx.save(); ctx.beginPath(); ctx.rect(ml, 0, W - ml - mr, H - mb); ctx.clip();
+    const path = fn => { ctx.beginPath(); for (let i = 0; i <= 600; i++) { const x = lo + (hi - lo) * i / 600; i ? ctx.lineTo(X(x), Y(fn(x))) : ctx.moveTo(X(x), Y(fn(x))); } };
+    path(pst); ctx.lineTo(X(hi), Y(0)); ctx.lineTo(X(lo), Y(0)); ctx.closePath(); ctx.fillStyle = c['est-soft']; ctx.fill();
+    ctx.lineJoin = 'round';
+    path(prior); ctx.strokeStyle = c.pred; ctx.lineWidth = 1.8; ctx.stroke();
+    path(lik); ctx.strokeStyle = c.obs; ctx.lineWidth = 1.8; ctx.stroke();
+    path(pst); ctx.strokeStyle = c.est; ctx.lineWidth = 3; ctx.stroke();
+    path(kf); ctx.strokeStyle = c.ink; ctx.lineWidth = 1.6; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+    const tick = (x, col, dash) => { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash(dash ? [3, 3] : []); ctx.beginPath(); ctx.moveTo(X(x), H - mb - 9); ctx.lineTo(X(x), H - mb + 1); ctx.stroke(); ctx.setLineDash([]); };
+    if (post.norm) tick(post.mean, c.est); tick(kfM, c.ink, true);
+  }
+  const mv = prep($('l4map'));
+  if (mv.ctx) {
+    const { ctx, W, H } = mv, c = T();
+    const ml = 46, mr = 16, mt = 12, mb = 28, n = 80;
+    const zs = [], bm = []; for (let i = 0; i <= n; i++) { const zz2 = lo + (hi - lo) * i / n; zs.push(zz2); bm.push(bayesPost(zz2, false).mean); }
+    const kfl = zz2 => L4B.m1 + K * (zz2 - L4B.m1);
+    let y0 = Math.min(kfl(lo), L4B.m1 - 1), y1 = Math.max(kfl(hi), L4B.m1 + 1);
+    bm.forEach(v => { if (isFinite(v)) { y0 = Math.min(y0, v); y1 = Math.max(y1, v); } });
+    y0 = Math.floor(y0 - 0.5); y1 = Math.ceil(y1 + 0.5);
+    const X = v => ml + (W - ml - mr) * (v - lo) / (hi - lo), Y = v => mt + (H - mt - mb) * (1 - (v - y0) / (y1 - y0));
+    ctx.font = `10.5px ${c['f-mono']}`; ctx.fillStyle = c['ink-3']; ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    const ys = tickStep((H - mt - mb) / (y1 - y0), 34);
+    for (let v = Math.ceil(y0 / ys) * ys; v <= y1 + 1e-9; v += ys) { const py = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(ml, py); ctx.lineTo(W - mr, py); ctx.stroke(); ctx.fillText(v + '', ml - 6, py); }
+    axisX(ctx, c, X, H - mb, [2, 6, 10, 14, 18, 22], v => v === 22 ? 'z = 22' : v + '', W);
+    ctx.save(); ctx.beginPath(); ctx.rect(ml, mt, W - ml - mr, H - mt - mb); ctx.clip();
+    ctx.strokeStyle = c.rule; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(X(lo), Y(L4B.m1)); ctx.lineTo(X(hi), Y(L4B.m1)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X(lo), Y(lo)); ctx.lineTo(X(hi), Y(hi)); ctx.stroke();
+    ctx.strokeStyle = c.ink; ctx.lineWidth = 1.6; ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.moveTo(X(lo), Y(kfl(lo))); ctx.lineTo(X(hi), Y(kfl(hi))); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = c.est; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.beginPath(); let started = false;
+    zs.forEach((zz2, i) => { if (!isFinite(bm[i])) return; started ? ctx.lineTo(X(zz2), Y(bm[i])) : ctx.moveTo(X(zz2), Y(bm[i])); started = true; }); ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = c['ink-3']; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(z) + .5, mt); ctx.lineTo(X(z) + .5, H - mb); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = c.ink; ctx.beginPath(); ctx.arc(X(z), Y(kfM), 4.5, 0, Math.PI * 2); ctx.fill();
+    if (post.norm) { ctx.fillStyle = c.est; ctx.beginPath(); ctx.arc(X(z), Y(post.mean), 6, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = c.sheet; ctx.lineWidth = 2; ctx.stroke(); }
+  }
+  $('l4bzv').textContent = f1(z) + ' m';
+  $('l4bs1v').textContent = `${f2(L4B.s1)} m（P⁻ = ${f2(P)}）`;
+  $('l4bs2v').textContent = `${f2(L4B.s2)} m（R = ${f2(R)}）`;
+  $('l4br1').textContent = post.norm ? f2(post.mean) + ' m' : '—';
+  $('l4br2').textContent = f2(kfM) + ' m';
+  $('l4br3').textContent = post.norm ? f2(post.sd) + ' m' : '—';
+  $('l4br4').textContent = f2(Math.sqrt(kfV)) + ' m';
+}
+
+// the five equations, reused in lesson 2 (③④⑤) and lesson 3 (all)
+const FIVE = [
+  ['①', `${xP()} = ${xE(KM1)} + ${UDT}`, '预测位置：按运动规律往前推一步'],
+  ['②', `${PP()} = ${PE(KM1)} + ${QQ}`, '预测方差：走一步，多一份不确定'],
+  ['③', `${Kg()} = ${fr(PP(), `${PP()} + ${RR}`)}`, '卡尔曼增益：该信读数多少'],
+  ['④', `${xE()} = ${xP()} + ${Kg()}(${zz()} − ${xP()})`, '更新位置：往读数方向挪 K 倍的差距'],
+  ['⑤', `${PE()} = (1 − ${Kg()}) ${PP()}`, '更新方差：用上读数，不确定性变小'],
+];
+const ROUTE5 = [['线性最小方差', '只用均值和方差，不需要高斯'], ['贝叶斯', '噪声是高斯时，两个密度相乘'], ['极大后验', '找后验的最高点，取对数后就是加权最小二乘'], ['几何', '把信息榨干：误差与新息不相关，也就是垂直'], ['工程', '一阶低通滤波器']];
+const eqBlock = r => `<div class="eq"><div class="body"><span class="m">${r[1]}</span><div style="font-size:14px;line-height:1.5;color:var(--ink-2);font-family:var(--f-body)">${r[2]}</div></div><span class="tag">${r[0]}</span></div>`;
+$('l2update').innerHTML = FIVE.slice(2).map(eqBlock).join('');
+$('l3five').innerHTML = `<div class="phase">预测</div>` + FIVE.slice(0, 2).map(eqBlock).join('') + `<div class="phase">更新</div>` + FIVE.slice(2).map(eqBlock).join('');
+
+// ===================== LESSON 3 =====================
+const eP3 = C('pr', I('e') + ss('−', KK)), eE3 = k => C('es', I('e') + ss('', k));
+const w3 = `${I('w')}<sub>${KK}</sub>`, v3 = C('ob', `${I('v')}<sub>${KK}</sub>`), nu3 = `${I('r')}<sub>${KK}</sub>`;
+const st3 = items => items.map(([t, m, after]) => `<li><p>${t}</p>${m ? `<div class="mrow m">${m}</div>` : ''}${after || ''}</li>`).join('');
+$('l3sym1').innerHTML = xP(); $('l3sym2').innerHTML = PP(); $('l3sym3').innerHTML = zz(); $('l3sym4').innerHTML = xE(); $('l3sym5').innerHTML = PE();
+$('l3stage').innerHTML = [
+  ['<strong class="pr">预测</strong>', '运动模型', `${xE(KM1)}, ${PE(KM1)}`, `${xP()}, ${PP()}（先验）`, '变大，加上 Q'],
+  ['<strong class="ob">更新</strong>', `读数 ${zz()}`, `${xP()}, ${PP()}, ${zz()}`, `${xE()}, ${PE()}（后验）`, '变小，乘以 1 − K'],
+].map(r => `<tr><td>${r[0]}</td><td><span class="m">${r[1]}</span></td><td class="m">${r[2]}</td><td class="m">${r[3]}</td><td>${r[4]}</td></tr>`).join('');
+
+$('l3stepsA').innerHTML = st3([
+  [`起点是上一步的后验估计。把估计误差记作 <span class="m">${eE3(KM1)} = ${xE(KM1)} − ${xT(KM1)}</span>，它的均值为 0、方差为 <span class="m">${PE(KM1)}</span>：`, `E[${eE3(KM1)}] = 0,&emsp;Var(${eE3(KM1)}) = ${PE(KM1)}`],
+  [`运动模型是 <span class="m">${xT()} = ${xT(KM1)} + ${UDT} + ${w3}</span>。其中 <span class="m">${xT(KM1)}</span> 我们不知道，用它的估计 <span class="m">${xE(KM1)}</span> 代替；<span class="m">${w3}</span> 也不知道，只知道它均值为 0，所以最好的猜测就是 0。这就得到先验估计：`, `${xP()} = ${xE(KM1)} + ${UDT}&emsp;①`],
+  [`这个预测准不准？算一下预测误差，把 ① 和运动模型相减，<span class="m">${UDT}</span> 抵消：`, `${eP3} = ${xP()} − ${xT()} = (${xE(KM1)} − ${xT(KM1)}) − ${w3} = ${eE3(KM1)} − ${w3}`, `<p>两边取期望，E[e⁻] = 0，预测是无偏的。</p>`],
+  [`再算预测误差的方差。<span class="m">${eE3(KM1)}</span> 只由初始误差、之前的过程噪声 w₁…w<sub>k−1</sub> 和之前的量测噪声 v₁…v<sub>k−1</sub> 决定。按第 1 课的三条假设，<span class="m">${w3}</span> 和它们都不相关（分别用到假设 3、1、2），所以方差相加：`, `${PP()} = Var(${eE3(KM1)}) + Var(${w3}) = ${PE(KM1)} + ${QQ}&emsp;②`],
+  [`所以每预测一次，方差增加一个 Q。如果一直没有读数，只能一直预测，方差就一步加一个 Q。第 1 课「只信预测」的误差方差 kQ 正是这么来的。`, ''],
+]);
+$('l3stepsB').innerHTML = st3([
+  [`读数到了：<span class="m">${zz()} = ${xT()} + ${v3}</span>。先看它和预测差多少，这个差叫<strong>新息</strong>，是读数里预测没有料到的部分，记作 r，取自「残差」的英文 residual：`, `${nu3} = ${zz()} − ${xP()}`],
+  [`用新息修正先验估计，修正的幅度由增益 <span class="m">${Kg()}</span> 决定，它的取值暂时待定：`, `${xE()} = ${xP()} + ${Kg()} ${nu3} = ${xP()} + ${Kg()}(${zz()} − ${xP()})&emsp;④`],
+  [`算后验误差。把 ④ 两边减去 <span class="m">${xT()}</span>，并代入 <span class="m">${zz()} − ${xT()} = ${v3}</span>：`, `${eE3(KK)} = ${xE()} − ${xT()} = (1 − ${Kg()}) ${eP3} + ${Kg()} ${v3}`, `<p>两边取期望，E[e] = 0：不管 K 取多少，后验估计都是无偏的。</p>`],
+  [`算后验误差的方差。预测误差 <span class="m">${eP3}</span> 由初始误差、w₁…w<sub>k</sub> 和 v₁…v<sub>k−1</sub> 决定，按那三条假设，这一步的量测噪声 <span class="m">${v3}</span> 和它们都不相关，所以没有交叉项：`, `${PE()} = (1 − ${Kg()})<sup>2</sup> ${PP()} + ${Kg()}<sup>2</sup> ${RR}`, `<p>这个式子对任意的 K 都成立。</p>`],
+  [`选 <span class="m">${Kg()}</span> 使后验方差最小。这正是第 2 课做过的事，对 K 求导并令导数为 0：`, `${Kg()} = ${fr(PP(), `${PP()} + ${RR}`)}&emsp;③`],
+  [`把 ③ 代回上面的方差公式，化简得到：`, `${PE()} = (1 − ${Kg()}) ${PP()}&emsp;⑤`, `<p>注意 ⑤ 只在 K 取最优值 ③ 时才成立。如果因为某种原因用了别的 K，方差要用第 4 步那个对任意 K 都成立的式子来算。</p>`],
+  [`更新完成。<span class="m">${xE()}</span> 和 <span class="m">${PE()}</span> 成为下一步预测的起点，回到 ①。`, ''],
+]);
+$('l3stepsC').innerHTML = st3([
+  [`循环总得有个起点。第 0 步要给定<strong>初始估计</strong> <span class="m">${xE(0)}</span>，也就是你对起点最好的猜测，以及<strong>初始误差方差</strong> <span class="m">${PE(0)}</span>，表示你对这个猜测有多大把握：`, `${xE(0)} = E[${xT(0)}],&emsp;${PE(0)} = Var(${xE(0)} − ${xT(0)})`,
+    `<p>对起点一无所知时，就把 P₀ 设得很大：第一步的 K 会接近 1，滤波器直接采信第一次读数，之后 P 很快收敛。也有人直接用第一次读数初始化，令 x̂ = z、P = R，效果和 P₀ → ∞ 时的第一步完全一样。</p>`],
+]);
+
+function drawSaw() {
+  const cv = prep($('l3saw')); if (!cv.ctx) return;
+  const S = car(L3.seed, L3.sw, L3.sr, L3.x0, L3.s0 ** 2), { ctx, W, H } = cv, c = T(), n = 12;
+  const ml = 44, mr = 16, mt = 12, mb = 26;
+  let ymax = S.P0; for (let k = 1; k <= n; k++) ymax = Math.max(ymax, S.Pp[k]);
+  ymax = niceMax(ymax * 1.08);
+  const X = k => ml + (W - ml - mr) * k / n, Y = v => mt + (H - mt - mb) * (1 - v / ymax);
+  ctx.font = `10.5px ${c['f-mono']}`; ctx.fillStyle = c['ink-3']; ctx.strokeStyle = c.grid; ctx.lineWidth = 1; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const v of [0, ymax / 2, ymax]) { const py = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(ml, py); ctx.lineTo(W - mr, py); ctx.stroke(); ctx.fillText(+v.toFixed(2) + '', ml - 6, py); }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let k = 0; k <= n; k++) ctx.fillText(k === 0 ? 'k=0' : k, X(k), H - mb + 6);
+  ctx.save(); ctx.translate(11, mt + (H - mt - mb) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('方差 (m²)', 0, 0); ctx.restore();
+  const seg = (x0, y0, x1, y1, col, lw) => { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(X(x0), Y(y0)); ctx.lineTo(X(x1), Y(y1)); ctx.stroke(); };
+  ctx.lineCap = 'round';
+  for (let k = 1; k <= n; k++) {
+    const p0 = S.P[k - 1], pp = S.Pp[k], p1 = S.P[k], xu = k - 0.3;
+    seg(k - 1, p0, xu, p0, c.est, 2);
+    seg(xu, p0, xu, pp, c.pred, 2.5);
+    seg(xu, pp, k, pp, c.pred, 2.5);
+    seg(k, pp, k, p1, c.obs, 2.5);
+  }
+  ctx.fillStyle = c.est; for (let k = 0; k <= n; k++) { ctx.beginPath(); ctx.arc(X(k), Y(S.P[k]), 3.5, 0, Math.PI * 2); ctx.fill(); }
+  ctx.font = `600 12px ${c['f-body']}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.fillStyle = c.est; ctx.fillText(`P₀ = ${fv(S.P0)}`, X(0) + 8, Y(S.P0) + (S.P0 > ymax * 0.85 ? 12 : -12));
+  ctx.fillStyle = c['ink-2']; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText(`稳态：P⁻ = ${fv(S.Ppinf)}，P = ${fv(S.Ppinf * S.R / (S.Ppinf + S.R))}`, W - mr, Y(S.Pp[n]) - 10);
+}
+
+$('l3ss').innerHTML = [
+  [`跑了足够多步以后，<span class="m">${PP()}</span> 不再变化，记作 <span class="m">${I('P')}<sup>−</sup><sub>∞</sub></span>。把 ⑤ 代入 ②：`, `${I('P')}<sup>−</sup><sub>∞</sub> = (1 − ${I('K')}<sub>∞</sub>) ${I('P')}<sup>−</sup><sub>∞</sub> + ${QQ} = ${fr(`${I('P')}<sup>−</sup><sub>∞</sub> ${RR}`, `${I('P')}<sup>−</sup><sub>∞</sub> + ${RR}`)} + ${QQ}`],
+  [`两边乘以 <span class="m">${I('P')}<sup>−</sup><sub>∞</sub> + ${RR}</span>，整理成一元二次方程：`, `(${I('P')}<sup>−</sup><sub>∞</sub>)<sup>2</sup> − ${QQ} ${I('P')}<sup>−</sup><sub>∞</sub> − ${QQ}${RR} = 0`],
+  [`取正根，再代回 ③：`, `${I('P')}<sup>−</sup><sub>∞</sub> = ${fr(`${QQ} + √(${QQ}<sup>2</sup> + 4${QQ}${RR})`, '2')},&emsp;&emsp;${I('K')}<sub>∞</sub> = ${fr(`${I('P')}<sup>−</sup><sub>∞</sub>`, `${I('P')}<sup>−</sup><sub>∞</sub> + ${RR}`)}`, 'l3sslive'],
+].map(([t, m, id]) => `<li><p>${t}</p><div class="mrow m">${m}</div>${id ? `<div class="live" id="${id}"></div>` : ''}</li>`).join('');
+
+const L3 = { seed: 7, sw: 0.5, sr: 2, x0: 3, s0: 3, k: 1, s: 0, auto: false, timer: 0 };
+const SAY = [
+  '上一步的估计就是起点。接下来先做预测。',
+  '① 小车按名义速度开了 uΔt，所以估计也跟着往前挪。曲线的宽度暂时没变。',
+  '② 但开的过程中可能打滑，不确定性增加了 Q。黄色曲线变宽了。',
+  '③ 传感器读数到了（红色）。比较预测方差和读数方差，算出该信读数多少。',
+  '④ 从预测出发，往读数的方向挪 K 倍的差距，得到新的位置估计。',
+  '⑤ 用上了新信息，不确定性变小。蓝色曲线比黄、红两条都窄。这一步结束。',
+];
+function drawL3() {
+  drawSaw();
+  const S = car(L3.seed, L3.sw, L3.sr, L3.x0, L3.s0 ** 2), k = L3.k, s = L3.s;
+  const n = (v, cls = '') => `<b class="num ${cls}">${v}</b>`;
+  const xprev = S.xe[k - 1], Pprev = S.P[k - 1];
+  $('l3where').textContent = `第 ${k} 步 · ${s === 0 ? '开始' : '公式 ' + '①②③④⑤'[s - 1]}`;
+  $('l3say').textContent = k === 1 && s === 0 ? '第 0 步只有初始估计 x̂₀ 和初始误差方差 P₀，还没有读数。从这里出发，先做预测。' : SAY[s];
+  $('l3k').textContent = `k = ${k} / ${N - 1}`;
+  $('l3init').innerHTML = `初始化：<span class="m">${xE(0)} = ${f2(S.x0h)}</span>，<span class="m">${PE(0)} = ${fv(S.P0)}</span>。真实起点是 x₀ = 0，所以初始误差是 ${f2(S.x0h)} m，而滤波器以为自己的误差大约在 ±${f2(Math.sqrt(S.P0))} m 以内。`;
+  const kn = String(k), km = String(k - 1);
+  const rows = [
+    [`${xP(kn)} = ${xE(km)} + ${UDT}`, `= ${n(f2(xprev))} + ${n(f2(U * DT))} = ${n(f2(S.xp[k]), 'pr')}`],
+    [`${PP(kn)} = ${PE(km)} + ${QQ}`, `= ${n(fv(Pprev))} + ${n(fv(S.Q))} = ${n(fv(S.Pp[k]), 'pr')}`],
+    [`${Kg(kn)} = ${fr(PP(kn), `${PP(kn)} + ${RR}`)}`, `= ${fr(n(fv(S.Pp[k])), `${n(fv(S.Pp[k]))} + ${n(fv(S.R))}`)} = ${n(f3(S.K[k]))}`],
+    [`${xE(kn)} = ${xP(kn)} + ${Kg(kn)}(${zz(kn)} − ${xP(kn)})`, `= ${n(f2(S.xp[k]))} + ${n(f3(S.K[k]))} × (${n(f2(S.z[k]))} − ${n(f2(S.xp[k]))}) = ${n(f2(S.xe[k]), 'es')}`],
+    [`${PE(kn)} = (1 − ${Kg(kn)}) ${PP(kn)}`, `= ${n(f3(1 - S.K[k]))} × ${n(fv(S.Pp[k]))} = ${n(fv(S.P[k]), 'es')}`],
+  ];
+  $('l3stepper').innerHTML = `<div class="phase">预测</div>` + rows.map((r, i) => {
+    const st = i + 1 < s ? 'done' : i + 1 === s ? 'cur done' : 'todo';
+    return (i === 2 ? `<div class="phase">更新</div>` : '') + `<div class="srow ${st}"><span class="t">${'①②③④⑤'[i]}</span><div class="b"><span class="m">${r[0]}</span>${i + 1 <= s ? `&ensp;<span class="m">${r[1]}</span>` : ''}</div></div>`;
+  }).join('');
+  // gaussian panel
+  const ctr = S.xp[k], half = Math.max(4, 3.2 * Math.sqrt(Math.max(S.Pp[k], S.R)), Math.abs(S.z[k] - ctr) + 2, Math.abs(S.x[k] - ctr) + 2, Math.abs(S.xe[k - 1] - ctr) + 2);
+  const curves = [], marks = [];
+  if (s === 0) curves.push({ m: xprev, v: Pprev, col: 'est', fill: 'est-soft', lw: 2.5 });
+  else curves.push({ m: xprev, v: Pprev, col: 'est', dash: true, alpha: .55, lw: 1.5, stem: false });
+  if (s === 1) curves.push({ m: S.xp[k], v: Pprev, col: 'pred', fill: 'pred-soft' });
+  if (s >= 2) curves.push({ m: S.xp[k], v: S.Pp[k], col: 'pred', fill: 'pred-soft' });
+  if (s >= 3) curves.push({ m: S.z[k], v: S.R, col: 'obs', fill: 'obs-soft' });
+  if (s === 4) marks.push({ m: S.xe[k], col: 'est' });
+  if (s >= 5) curves.push({ m: S.xe[k], v: S.P[k], col: 'est', fill: 'est-soft', lw: 3 });
+  gaussPanel($('l3c'), {
+    lo: ctr - half, hi: ctr + half, curves, marks, truth: S.x[k],
+    arrow: s === 1 ? { from: xprev, to: S.xp[k] } : null,
+    lever: s >= 4 ? { a: S.xp[k], b: S.z[k], m: S.xe[k], K: S.K[k] } : { a: S.xp[k], b: S.xp[k], m: S.xp[k], K: 0, hide: true },
+  });
+  // strips
+  const kd = s >= 4 ? k : k - 1;
+  let ym = Math.max(3 * S.sr, Math.min(2 * Math.sqrt(S.P0), 4 * S.sr)); for (let i = 0; i < N; i++) ym = Math.max(ym, Math.abs(S.xe[i] - S.x[i]));
+  ym = niceMax(ym * 1.05);
+  const f = strip($('l3err'), { n: N, lo: -ym, hi: ym, ticks: [-ym, 0, ym], fmt: v => (v > 0 ? '+' : '') + v });
+  if (f) {
+    const { ctx, c } = f;
+    ctx.fillStyle = c['est-soft']; ctx.beginPath();
+    for (let i = 0; i <= kd; i++) ctx.lineTo(f.X(i), f.Y(2 * Math.sqrt(S.P[i])));
+    for (let i = kd; i >= 0; i--) ctx.lineTo(f.X(i), f.Y(-2 * Math.sqrt(S.P[i])));
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c.obs; ctx.globalAlpha = .6; for (let i = 1; i <= (s >= 3 ? k : k - 1); i++) { ctx.beginPath(); ctx.arc(f.X(i), f.Y(S.z[i] - S.x[i]), 2.2, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
+    polyline(f, 0, kd, i => S.xe[i] - S.x[i], c.est, 2);
+    cursor(f, k); f.done();
+  }
+  const g = strip($('l3gain'), { n: N, lo: 0, hi: 1, ticks: [0, 0.5, 1], fmt: v => v.toFixed(1) });
+  if (g) {
+    const { ctx, c } = g;
+    ctx.strokeStyle = c['ink-3']; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(g.X(0), g.Y(S.Kinf)); ctx.lineTo(g.X(N - 1), g.Y(S.Kinf)); ctx.stroke(); ctx.setLineDash([]);
+    const kg = s >= 3 ? k : k - 1;
+    if (kg >= 1) { polyline(g, 1, kg, i => S.K[i], c.ink, 2); ctx.fillStyle = c.ink; ctx.beginPath(); ctx.arc(g.X(kg), g.Y(S.K[kg]), 3, 0, Math.PI * 2); ctx.fill(); }
+    cursor(g, k); g.done();
+  }
+  $('l3kinf').textContent = f2(S.Kinf);
+  $('l3kpct').textContent = Math.round(S.Kinf * 100) + '%';
+  const sl = $('l3sslive'); if (sl) sl.innerHTML = `用现在的参数（Q = ${fv(S.Q)}，R = ${fv(S.R)}）：P⁻∞ = ${fv(S.Ppinf)}，<b>K∞ = ${f3(S.Kinf)}</b>`;
+}
+function l3advance() {
+  if (L3.s < 5) L3.s++;
+  else if (L3.k < N - 1) { L3.k++; L3.s = 1; }
+  else { stopAuto(); return; }
+  drawL3();
+}
+function stopAuto() { L3.auto = false; clearInterval(L3.timer); $('l3auto').setAttribute('aria-pressed', 'false'); $('l3auto').textContent = '自动播放'; $('l3ff').setAttribute('aria-pressed', 'false'); $('l3ff').textContent = '快进到底'; }
+$('l3next').addEventListener('click', () => { stopAuto(); l3advance(); });
+$('l3full').addEventListener('click', () => { stopAuto(); if (L3.s < 5) L3.s = 5; else if (L3.k < N - 1) { L3.k++; L3.s = 5; } drawL3(); });
+$('l3reset').addEventListener('click', () => { stopAuto(); L3.k = 1; L3.s = 0; drawL3(); });
+$('l3auto').addEventListener('click', () => {
+  if (L3.auto) { stopAuto(); return; }
+  if (L3.k >= N - 1 && L3.s >= 5) { L3.k = 1; L3.s = 0; }
+  L3.auto = true; $('l3auto').setAttribute('aria-pressed', 'true'); $('l3auto').textContent = '暂停';
+  L3.timer = setInterval(l3advance, 650);
+});
+$('l3ff').addEventListener('click', () => {
+  if (L3.auto) { stopAuto(); return; }
+  if (L3.k >= N - 1 && L3.s >= 5) { L3.k = 1; L3.s = 0; }
+  L3.auto = true; $('l3ff').setAttribute('aria-pressed', 'true'); $('l3ff').textContent = '暂停';
+  L3.timer = setInterval(() => { if (L3.k >= N - 1 && L3.s >= 5) { stopAuto(); return; } if (L3.s < 5) L3.s = 5; else { L3.k++; L3.s = 5; } drawL3(); }, 45);
+});
+const L3P = [['初值合理', 3, 3], ['初值错了，还很自信', 6, 0.3], ['完全不知道起点', 8, 10]];
+L3P.forEach(([name, x0, s0]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = name; b.addEventListener('click', () => { L3.x0 = x0; L3.s0 = s0; $('l3x0').value = x0; $('l3s0').value = s0; stopAuto(); L3.k = 1; L3.s = 0; syncL3(); }); $('l3init-presets').appendChild(b); });
+$('l3x0').addEventListener('input', e => { L3.x0 = +e.target.value; syncL3(); });
+$('l3s0').addEventListener('input', e => { L3.s0 = +e.target.value; syncL3(); });
+function syncL3() {
+  $('l3swv').textContent = `${L3.sw.toFixed(2)} m（Q = ${fv(L3.sw ** 2)}）`;
+  $('l3srv').textContent = `${L3.sr.toFixed(1)} m（R = ${fv(L3.sr ** 2)}）`;
+  $('l3x0v').textContent = `${f1(L3.x0)} m（真实起点 0）`;
+  $('l3s0v').textContent = `${f1(L3.s0)} m（P₀ = ${fv(L3.s0 ** 2)}）`;
+  document.querySelectorAll('#l3init-presets .chip').forEach((b, i) => b.setAttribute('aria-pressed', L3P[i][1] === L3.x0 && L3P[i][2] === L3.s0));
+  drawL3();
+}
+$('l3sw').addEventListener('input', e => { L3.sw = +e.target.value; syncL3(); });
+$('l3sr').addEventListener('input', e => { L3.sr = +e.target.value; syncL3(); });
+
+// ===================== shared for lessons 5–7 =====================
+const stepsHTML = items => items.map(([t, m, after]) => `<li><p>${t}</p>${m ? `<div class="mrow m">${m}</div>` : ''}${after || ''}</li>`).join('');
+function arrow(ctx, a, b, col, lw) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy); if (L < 2) return;
+  const ux = dx / L, uy = dy / L, h = 10;
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0] - ux * h * .8, b[1] - uy * h * .8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0] - ux * h - uy * h * .45, b[1] - uy * h + ux * h * .45); ctx.lineTo(b[0] - ux * h + uy * h * .45, b[1] - uy * h - ux * h * .45); ctx.closePath(); ctx.fill();
+}
+function axisX(ctx, c, X, y, ticks, fmt, W) {
+  ctx.strokeStyle = c['ink-3']; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(ticks[0]), y + .5); ctx.lineTo(X(ticks[ticks.length - 1]), y + .5); ctx.stroke();
+  ctx.fillStyle = c['ink-3']; ctx.font = `10.5px ${c['f-mono']}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ticks.forEach(v => { ctx.beginPath(); ctx.moveTo(X(v), y); ctx.lineTo(X(v), y + 4); ctx.stroke(); ctx.fillText(fmt(v), Math.min(X(v), W - 16), y + 6); });
+}
+
+// ===================== LESSON 5 · optimisation view =====================
+$('l5J').innerHTML = `${I('J')}(${I('x')}) = ${fr(`(${I('x')} − ${xm})<sup>2</sup>`, Pm)} + ${fr(`(${z1} − ${I('x')})<sup>2</sup>`, RR)}`;
+const L5 = { m1: 10, s1: 2, z: 12, s2: 1, loss: 'sq' };
+const HUB_C = 1.345;
+const psi = r => Math.abs(r) <= HUB_C ? r : HUB_C * Math.sign(r);
+const rhoH = r => Math.abs(r) <= HUB_C ? r * r / 2 : HUB_C * Math.abs(r) - HUB_C * HUB_C / 2;
+function l5solve(loss) {
+  const P1 = L5.s1 ** 2;
+  if (loss === 'sq') { const P2 = L5.s2 ** 2; return L5.m1 + P1 / (P1 + P2) * (L5.z - L5.m1); }
+  let lo = Math.min(L5.m1, L5.z) - 1, hi = Math.max(L5.m1, L5.z) + 1;
+  const g = x => (x - L5.m1) / P1 - psi((L5.z - x) / L5.s2) / L5.s2;   // dJ/dx / 2, increasing in x
+  for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (g(mid) > 0) hi = mid; else lo = mid; }
+  return (lo + hi) / 2;
+}
+const L5J1 = x => (x - L5.m1) ** 2 / L5.s1 ** 2;
+const L5J2 = (x, loss) => loss === 'sq' ? (L5.z - x) ** 2 / L5.s2 ** 2 : 2 * rhoH((L5.z - x) / L5.s2);
+function zigzag(ctx, x0, x1, y, coils, amp) {
+  const n = coils * 2, L = x1 - x0, lead = Math.sign(L) * Math.min(Math.abs(L) * 0.12, 10), span = L - 2 * lead;
+  ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + lead, y);
+  for (let i = 1; i < n; i++) ctx.lineTo(x0 + lead + span * i / n, y + (i % 2 ? -amp : amp));
+  ctx.lineTo(x1 - lead, y); ctx.lineTo(x1, y); ctx.stroke();
+}
+$('l5map').innerHTML = stepsHTML([
+  [`极大后验估计的定义：在所有位置里，挑后验密度最大的那个。由贝叶斯公式，后验正比于似然乘先验：`, `${xh} = arg max ${I('p')}(${I('x')} | ${I('z')}) = arg max ${I('p')}(${I('z')} | ${I('x')}) · ${I('p')}(${I('x')})`, `<p>arg max 的意思是「让后面的式子取最大值的那个 x」。</p>`],
+  [`代入高斯的先验 <span class="m">${I('N')}(${xm}, ${Pm})</span> 和高斯的似然（中心 <span class="m">${z1}</span>、方差 <span class="m">${RR}</span>），就是第 4 课的那个乘积：`, `${I('p')}(${I('x')} | ${I('z')}) ∝ exp(−½ [ ${fr(`(${I('x')} − ${xm})<sup>2</sup>`, Pm)} + ${fr(`(${z1} − ${I('x')})<sup>2</sup>`, RR)} ])`],
+  [`直接对它求最大值不方便，先取对数。对数是单调递增的，不改变最大值出现的位置，而且正好把指数消掉。再乘以 −2，最大就变成了最小：`, `−2 ln ${I('p')}(${I('x')} | ${I('z')}) = ${fr(`(${I('x')} − ${xm})<sup>2</sup>`, Pm)} + ${fr(`(${z1} − ${I('x')})<sup>2</sup>`, RR)} + 常数`],
+  [`常数不影响最小值的位置，扔掉。把剩下的部分记作 J(x)，极大后验估计就成了一个最小化问题：`, `${xh} = arg min ${I('J')}(${I('x')})`],
+]);
+$('l5steps').innerHTML = stepsHTML([
+  [`对 x 求导，令导数为 0：`, `${fr(`d${I('J')}`, `d${I('x')}`)} = ${fr(`2(${I('x')} − ${xm})`, Pm)} − ${fr(`2(${z1} − ${I('x')})`, RR)} = 0`],
+  [`两边乘以 P⁻R / 2，解出 x：`, `${xh} = ${fr(`${RR}${xm} + ${Pm}${z1}`, `${Pm} + ${RR}`)} = ${xm} + ${fr(Pm, `${Pm} + ${RR}`)} (${z1} − ${xm})`, `<p>括号前的系数正是第 2 课的 K。高斯分布的最高点和均值重合，所以这里的极大后验估计，和上一课的后验均值是同一个数。</p>`],
+  [`再看曲线有多「弯」。二阶导数是一个常数：`, `${fr(`d<sup>2</sup>${I('J')}`, `d${I('x')}<sup>2</sup>`)} = 2 (${fr('1', Pm)} + ${fr('1', RR)}) = ${fr('2', Ph)}`,
+    `<p>J 越弯，最小点越「尖」，估计越确定。它说的正是精度相加 1/P = 1/P⁻ + 1/R，也就是弹簧的总劲度。只传播精度、不传播方差的写法叫<strong>信息形式</strong>，多个传感器融合时最方便：每个传感器把自己的精度加上去就行。</p>`],
+  [`<strong>递推最小二乘。</strong>假设车不动（u = 0，Q = 0），手上有初值 x̂₀、P₀ 和 k 个读数。一次性把它们全部放进加权最小二乘：`,
+    `${I('J')}(${I('x')}) = ${fr(`(${I('x')} − ${I(hat('x'))}<sub>0</sub>)<sup>2</sup>`, `${I('P')}<sub>0</sub>`)} + ∑${ss(I('k'), `${I('i')}=1`)} ${fr(`(${C('ob', I('z'))}<sub>${I('i')}</sub> − ${I('x')})<sup>2</sup>`, RR)}&emsp;⇒&emsp;${xh}<sub>${I('k')}</sub> = ${fr(`${I(hat('x'))}<sub>0</sub> / ${I('P')}<sub>0</sub> + ∑ ${C('ob', I('z'))}<sub>${I('i')}</sub> / ${RR}`, `1 / ${I('P')}<sub>0</sub> + ${I('k')} / ${RR}`)}`,
+    `<p>卡尔曼滤波一步一步递推得到的结果，和这个一次性求解完全相同，代码里可以验证。也就是说，卡尔曼滤波是一个不用存下全部历史数据的最小二乘。车在动的时候也成立，只是要把每一步的位置都当成未知数一起求解，进阶篇的平滑一课会展开。</p>`],
+]);
+const L5P = [['两者一致', { m1: 10, s1: 2, z: 12, s2: 1 }], ['读数离谱', { m1: 10, s1: 1, z: 18, s2: 1 }], ['读数很准', { m1: 10, s1: 2, z: 13, s2: 0.4 }]];
+L5P.forEach(([name, p]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = name; b.addEventListener('click', () => { Object.assign(L5, p); for (const k of ['m1', 's1', 'z', 's2']) $('l5' + k).value = L5[k]; drawL5(); }); $('l5presets').appendChild(b); });
+for (const k of ['m1', 's1', 'z', 's2']) $('l5' + k).addEventListener('input', e => { L5[k] = +e.target.value; drawL5(); });
+$('l5sq').addEventListener('click', () => { L5.loss = 'sq'; drawL5(); });
+$('l5hub').addEventListener('click', () => { L5.loss = 'hub'; drawL5(); });
+function drawL5() {
+  const xs = l5solve(L5.loss), xq = l5solve('sq'), lo = 0, hi = 24;
+  $('l5sq').setAttribute('aria-pressed', L5.loss === 'sq'); $('l5hub').setAttribute('aria-pressed', L5.loss === 'hub');
+  const sv = prep($('l5spring'));
+  if (sv.ctx) {
+    const { ctx, W, H } = sv, c = T();
+    const pad = 22, X = x => pad + (W - 2 * pad) * (x - lo) / (hi - lo);
+    const axisY = H - 26, y1 = 44, y2 = 92;
+    axisX(ctx, c, X, axisY, [0, 4, 8, 12, 16, 20, 24], v => v + (v === 24 ? ' m' : ''), W);
+    const k1 = 1 / L5.s1 ** 2, k2 = 1 / L5.s2 ** 2, kmax = Math.max(k1, k2), lw = k => 1.2 + 4 * k / kmax;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = c.pred; ctx.lineWidth = lw(k1); zigzag(ctx, X(L5.m1), X(xs), y1, 7, 7);
+    ctx.strokeStyle = c.obs; ctx.lineWidth = lw(k2);
+    const d = L5.z - xs, lim = HUB_C * L5.s2;
+    if (L5.loss === 'hub' && Math.abs(d) > lim) {
+      const xk = xs + Math.sign(d) * lim;
+      zigzag(ctx, X(xs), X(xk), y2, 4, 7);
+      ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(xk), y2); ctx.lineTo(X(L5.z), y2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = c.obs; ctx.font = `12px ${c['f-body']}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('超出部分只用固定的力', (X(xk) + X(L5.z)) / 2, y2 + 8);
+    } else zigzag(ctx, X(xs), X(L5.z), y2, 7, 7);
+    const post = (x, y, col, txt) => { ctx.fillStyle = col; ctx.fillRect(X(x) - 3, y - 17, 6, 34); ctx.font = `600 12px ${c['f-body']}`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'center'; ctx.fillText(txt, X(x), y - 20); };
+    post(L5.m1, y1, c.pred, '预测'); post(L5.z, y2, c.obs, '读数');
+    if (L5.loss === 'hub' && Math.abs(xq - xs) > 0.05) {
+      ctx.strokeStyle = c['ink-3']; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.strokeRect(X(xq) - 11, y1 - 16, 22, y2 - y1 + 32); ctx.setLineDash([]);
+      ctx.fillStyle = c['ink-3']; ctx.font = `11px ${c['f-body']}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText('普通弹簧时在这', X(xq), y1 - 18);
+    }
+    ctx.fillStyle = c.est; ctx.fillRect(X(xs) - 11, y1 - 16, 22, y2 - y1 + 32);
+  }
+  const jv = prep($('l5J2'));
+  if (jv.ctx) {
+    const { ctx, W, H } = jv, c = T();
+    const ml = 14, mr = 14, mt = 10, mb = 24;
+    const X = x => ml + (W - ml - mr) * (x - lo) / (hi - lo);
+    const Jt = x => L5J1(x) + L5J2(x, L5.loss), jmin = Jt(xs), ymax = Math.max(jmin * 2.5, jmin + 12);
+    const Y = v => mt + (H - mt - mb) * (1 - v / ymax);
+    axisX(ctx, c, X, H - mb, [0, 4, 8, 12, 16, 20, 24], v => v + (v === 24 ? ' m' : ''), W);
+    ctx.save(); ctx.beginPath(); ctx.rect(ml, 0, W - ml - mr, H - mb); ctx.clip();
+    const curve = (f, col, lw, dash) => { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.setLineDash(dash ? [6, 5] : []); ctx.beginPath(); for (let i = 0; i <= 300; i++) { const x = lo + (hi - lo) * i / 300; i ? ctx.lineTo(X(x), Y(f(x))) : ctx.moveTo(X(x), Y(f(x))); } ctx.stroke(); ctx.setLineDash([]); };
+    curve(L5J1, c.pred, 1.5, true); curve(x => L5J2(x, L5.loss), c.obs, 1.5, true); curve(Jt, c.ink, 2.5);
+    ctx.strokeStyle = c.est; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(xs) + .5, Y(jmin)); ctx.lineTo(X(xs) + .5, H - mb); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = c.est; ctx.beginPath(); ctx.arc(X(xs), Y(jmin), 6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  const pv5 = prep($('l5post'));
+  if (pv5.ctx) {
+    const { ctx, W, H } = pv5, c = T(), ml = 14, mr = 14, mt = 8, mb = 6;
+    const X = x => ml + (W - ml - mr) * (x - lo) / (hi - lo), Jt = x => L5J1(x) + L5J2(x, L5.loss), j0 = Jt(xs);
+    const Y = p => mt + (H - mt - mb) * (1 - p / 1.08);
+    ctx.beginPath(); for (let i = 0; i <= 480; i++) { const x = lo + (hi - lo) * i / 480, p = Math.exp(-(Jt(x) - j0) / 2); i ? ctx.lineTo(X(x), Y(p)) : ctx.moveTo(X(x), Y(p)); }
+    ctx.strokeStyle = c.est; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.lineTo(X(hi), Y(0)); ctx.lineTo(X(lo), Y(0)); ctx.closePath(); ctx.fillStyle = c['est-soft']; ctx.fill();
+    ctx.strokeStyle = c.est; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(xs) + .5, Y(1)); ctx.lineTo(X(xs) + .5, H); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = c.est; ctx.beginPath(); ctx.arc(X(xs), Y(1), 5, 0, Math.PI * 2); ctx.fill();
+  }
+  const k1 = 1 / L5.s1 ** 2, k2 = 1 / L5.s2 ** 2;
+  $('l5m1v').textContent = f1(L5.m1) + ' m'; $('l5s1v').textContent = `${f2(L5.s1)} m（劲度 ${f2(k1)}）`;
+  $('l5zv').textContent = f1(L5.z) + ' m'; $('l5s2v').textContent = `${f2(L5.s2)} m（劲度 ${f2(k2)}）`;
+  $('l5r1').textContent = f2(xs) + ' m';
+  $('l5r2').textContent = f2(k1 + k2);
+  $('l5r3').textContent = L5.loss === 'sq' ? fv(1 / (k1 + k2)) + ' m²' : '—';
+  $('l5r4').textContent = f2(Math.abs(xs - L5.m1)) + ' m';
+  document.querySelectorAll('#l5presets .chip').forEach((b, i) => { const p = L5P[i][1]; b.setAttribute('aria-pressed', ['m1', 's1', 'z', 's2'].every(k => p[k] === L5[k])); });
+}
+
+// ===================== code blocks =====================
+document.querySelectorAll('[data-code]').forEach(box => {
+  const tabs = box.querySelectorAll('.tab'), pres = box.querySelectorAll('pre');
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => x.setAttribute('aria-selected', x === t));
+    pres.forEach(p => p.hidden = p.dataset.lang !== t.dataset.lang);
+  }));
+  const btn = box.querySelector('.copy');
+  btn.addEventListener('click', () => {
+    const pre = [...pres].find(p => !p.hidden), text = pre.textContent;
+    const done = ok => { btn.textContent = ok ? '已复制' : '已选中，按 Ctrl+C'; setTimeout(() => btn.textContent = '复制', 1600); };
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); done(false); };
+    try { navigator.clipboard.writeText(text).then(() => done(true), fallback); } catch (e) { fallback(); }
+  });
+});
+// tiny built-in syntax highlighter (no external libraries, so the page works anywhere)
+(function () {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const LANG = {
+    python: {
+      com: "#[^\\n]*",
+      str: "\"\"\"[\\s\\S]*?\"\"\"|[rbfRBF]{0,2}'(?:\\\\.|[^'\\\\\\n])*'|[rbfRBF]{0,2}\"(?:\\\\.|[^\"\\\\\\n])*\"",
+      kw: "import|from|as|def|return|for|in|if|elif|else|while|lambda|and|or|not|None|True|False|with|class|pass|break|continue",
+    },
+    matlab: {
+      com: "%[^\\n]*",
+      str: "'(?:''|[^'\\n])*'",
+      kw: "for|end|function|if|elseif|else|while|return|break|continue",
+    },
+  };
+  document.querySelectorAll('pre code[class*="language-"]').forEach(el => {
+    const lang = (el.className.match(/language-(\w+)/) || [])[1];
+    const L = LANG[lang]; if (!L) return;
+    const re = new RegExp(`(${L.com})|(${L.str})|\\b(${L.kw})\\b|(\\b\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?\\b)|\\b([A-Za-z_]\\w*)(?=\\()`, 'g');
+    const src = el.textContent; let out = '', last = 0, m;
+    while ((m = re.exec(src))) {
+      out += esc(src.slice(last, m.index));
+      const cls = m[1] ? 'comment' : m[2] ? 'string' : m[3] ? 'keyword' : m[4] ? 'number' : 'function';
+      out += `<span class="token ${cls}">${esc(m[0])}</span>`;
+      last = re.lastIndex;
+    }
+    el.innerHTML = out + esc(src.slice(last));
+  });
+})();
+
+
+document.querySelectorAll('.kcard').forEach(el => {
+  const n = +el.dataset.route, r = ROUTE5[n - 1];
+  el.innerHTML = `<div class="kc-f"><span class="kc-n">第 ${n} 条路推出</span><span class="m">${I('K')} = ${fr(Pm, `${Pm} + ${RR}`)}</span></div><div class="kc-r"><b>${r[0]}</b><span>${r[1]}</span><span class="kc-dots" aria-label="入门篇共 5 条路，已走过 ${n} 条">${ROUTE5.map((x, i) => `<i class="${i < n ? 'on' : ''}" title="${x[0]}"></i>`).join('')}</span></div>`;
+});
+
+// ===================== routing & loop =====================
+const ROUTES = ['lesson-1', 'lesson-2', 'lesson-3', 'lesson-4', 'lesson-5'];
+let current = '';
+function route() {
+  let h = location.hash.slice(1); if (!ROUTES.includes(h)) h = 'lesson-1';
+  const changed = current && current !== h;
+  current = h;
+  ROUTES.forEach(r => { $(r).hidden = r !== h; });
+  document.querySelectorAll('.toc a[data-r]').forEach(a => { if (a.dataset.r === h) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (h !== 'lesson-3') stopAuto();
+  renderVisible();
+  if (changed) window.scrollTo(0, 0);
+}
+function renderVisible() {
+  if (current === 'lesson-1') drawL1();
+  if (current === 'lesson-2') drawL2();
+  if (current === 'lesson-4') syncL4();
+  if (current === 'lesson-5') drawL5();
+  if (current === 'lesson-3') drawL3();
+}
+window.addEventListener('hashchange', route);
+let last = 0;
+function loop(ts) {
+  const dt = last ? Math.min(0.1, (ts - last) / 1000) : 0; last = ts;
+  if (L1.playing && current === 'lesson-1') {
+    L1.k += dt * 25;
+    if (L1.k >= N - 1) { L1.k = N - 1; L1.playing = false; $('l1play').textContent = '▶ 播放'; }
+    drawL1();
+  }
+  requestAnimationFrame(loop);
+}
+const rerender = () => renderVisible();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender);
+new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+let rz = 0; window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(rerender); });
+
+syncL1(); syncL3();
+route();
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>
